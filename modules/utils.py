@@ -48,11 +48,10 @@ class Debugger:
             cv2.imwrite(path, img)
 
 
-    def nparray(self, mat):
+    def matrix(self, mat):
         if self.debug:
-            # name = getVarName(mat, locals()) print('--- Debug Print ---')
             try:
-                if len(mat.shape) == 1 and mat.shape[0] == 1:
+                if len(mat.shape) == 1 or mat.shape[0] == 1:
                     print(mat)
                 else:
                     print(mat.shape, mat.dtype, mat.min(), mat.mean(), mat.max())
