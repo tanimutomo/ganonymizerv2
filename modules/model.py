@@ -1,5 +1,6 @@
 import cv2
 import torch
+from PIL import Image
 
 class GANonymizer:
     def __init__(self, params, device, semseger, inpainter, shadow_detecter, debug):
@@ -14,14 +15,16 @@ class GANonymizer:
     def predict(self, img_path):
         # Loading input image
         img = cv2.imread(img_path)
+        img = img[:, :, ::-1]
         self.debug.img(img, 'Input Image')
 
         # semantic segmentation
         semseg_map = self._semseg(img)
         self.debug.img(semseg_map, 'Semantic Segmentation Map Prediction by DeepLabV3')
+        cv2.imwrite('data/exp/segmaps/segmap_' + img_path.split('/')[-1], semseg_map)
 
         # shadow detection
-        # shadow_map = self._shadow_detect(img, semseg_map)
+        shadow_map = self._shadow_detect(img, semseg_map)
         # self.debug.img(shadow_map, 'Predicted Shadow Map')
 
         # create mask image
@@ -42,6 +45,7 @@ class GANonymizer:
 
 
     def _shadow_detect(self, img, segmap):
+        shadow_map = self.shadow_detecter.detect(img, segmap)
         return None
 
 

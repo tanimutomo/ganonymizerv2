@@ -5,6 +5,7 @@ import torch
 from modules.model import GANonymizer
 from modules.deeplabv3.model.deeplabv3 import DeepLabV3
 from modules.utils import Debugger, set_networks
+from modules.shadow_detecter import ShadowDetecter
 
 
 def main(img, params, debug=False, save=False):
@@ -14,8 +15,8 @@ def main(img, params, debug=False, save=False):
 
     # setup models
     semseger = set_networks(DeepLabV3, params['resnet'], device)
+    shadow_detecter = ShadowDetecter(debugger)
     inpainter = None
-    shadow_detecter = None
 
     # model prediction
     model = GANonymizer(params, device, semseger, inpainter, shadow_detecter, debugger)
