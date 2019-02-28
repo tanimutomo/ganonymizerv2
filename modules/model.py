@@ -1,14 +1,16 @@
 import cv2
 import torch
+import pickle
 from PIL import Image
 
 class GANonymizer:
-    def __init__(self, params, device, semseger, inpainter, shadow_detecter, debug):
+    def __init__(self, params, device, semseger, inpainter, shadow_detecter, labels, debug):
         self.params = params
         self.devide = device
         self.semseger = semseger
         self.inpainter = inpainter
         self.shadow_detecter = shadow_detecter
+        self.labels = labels
         self.debug = debug
     
     
@@ -19,11 +21,15 @@ class GANonymizer:
         self.debug.img(img, 'Input Image')
 
         # semantic segmentation
-        semseg_map = self._semseg(img)
-        self.debug.img(semseg_map, 'Semantic Segmentation Map Prediction by DeepLabV3')
-        cv2.imwrite('data/exp/segmaps/segmap_' + img_path.split('/')[-1], semseg_map)
+        # semseg_map = self._semseg(img)
+        # self.debug.img(semseg_map, 'Semantic Segmentation Map Prediction by DeepLabV3')
+        # with open('./data/exp/segmap.pkl', mode='wb') as f:
+        #     pickle.dump(semseg_map, f)
+        # cv2.imwrite('data/exp/segmaps/segmap_' + img_path.split('/')[-1], semseg_map)
 
         # shadow detection
+        with open('./data/exp/segmap.pkl', mode='rb') as f:
+            semseg_map = pickle.load(f)
         shadow_map = self._shadow_detect(img, semseg_map)
         # self.debug.img(shadow_map, 'Predicted Shadow Map')
 
@@ -45,7 +51,7 @@ class GANonymizer:
 
 
     def _shadow_detect(self, img, segmap):
-        shadow_map = self.shadow_detecter.detect(img, segmap)
+        shadow_map = self.shadow_detecter.detect(img, segmap, self.labels)
         return None
 
 
