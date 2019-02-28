@@ -34,7 +34,7 @@ class Debugger:
             if self.save:
                 filepath = os.path.join('../data/output', str(self.order) 
                         + '_' + comment[:5] + '.png')
-                self._imsave(filepath, img)
+                self.imsave(filepath, img)
                 self.order += 1
 
 
@@ -43,8 +43,8 @@ class Debugger:
             print(string)
 
 
-    def _imsave(self, path, img):
-        if self.debug:
+    def imsave(self, path, img):
+        if self.save:
             cv2.imwrite(path, img)
 
 
