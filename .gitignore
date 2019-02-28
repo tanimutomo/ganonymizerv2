@@ -112,3 +112,4 @@ dmypy.json
 
 kronos-config.yml
 modules/deeplabv3/pretrained/
+data/exp/
