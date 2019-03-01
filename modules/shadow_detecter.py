@@ -11,7 +11,7 @@ class ShadowDetecter:
     
     def detect(self, img, segmap, labels):
         img_edges = cv2.Canny(img, 100, 200, L2gradient=True)
-        self.debug.matrix(img_edges)
+        self.debug.matrix(img_edges, 'img_edges')
         self.debug.img(img_edges, 'image edges', gray=True)
         # segmap_edges = cv2.Canny(segmap, 10, 20, L2gradient=True)
         # self.debug.matrix(segmap_edges)
@@ -29,29 +29,14 @@ class ShadowDetecter:
         car_map_3c = np.stack([car_map for _ in range(3)], axis=-1)
         img_with_mask = np.where(car_map_3c==255, car_map_3c, img).astype(np.uint8)
         self.debug.img(img_with_mask, 'Image with Mask')
-        self.debug.matrix(img_with_mask)
-
-        # oritginal image superpixel
-        # segments_fz = felzenszwalb(img, scale=100, sigma=0.5, min_size=50)
-        # segments_slic = slic(img, n_segments=250, compactness=10, sigma=1)
-        # print("Felzenszwalb number of segments: {}".format(len(np.unique(segments_fz))))
-        # print('SLIC number of segments: {}'.format(len(np.unique(segments_slic))))
-
-        # segfz_img = mark_boundaries(img, segments_fz)
-        # segslic_img = mark_boundaries(img, segments_slic)
-        # self.debug.img(segfz_img, 'Felzenszwalb Segmentation')
-        # self.debug.img(segslic_img, 'SLIC Segmentation')
-
-        # self.debug.matrix(segments_fz)
-
+        self.debug.matrix(img_with_mask, 'image with mask')
 
         # image with mask superpixel
-        self._slic(img_with_mask)
-
+        _, _ = self._slic(img_with_mask)
 
         # calcurate the bouding box
         car_map = car_map.astype(np.uint8)
-        self.debug.matrix(car_map)
+        self.debug.matrix(car_map, 'car map')
         contours, _ = cv2.findContours(car_map, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
         bboxes = []
         out1 = car_map.copy()
@@ -87,16 +72,33 @@ class ShadowDetecter:
             self.debug.img(car, 'car part')
             cars.append(car)
 
+        # the pixel of car part
+        car_y, car_x = np.where(car_map==255)
+        car_pos = np.array([car_x, car_y])
+
+        # apply SLIC to car part images
         for car in cars:
-            self._slic(car)
+            segmap, num = self._slic(car)
+            segmap = segmap + 1
+            car_gray = car.astype(np.int64)
+            car_gray = np.sum(car_gray, axis=-1)
+            self.debug.matrix(car_gray, 'car')
+            segmap = np.where(car_gray==255*3, 0, segmap)
+            self.debug.matrix(segmap, 'segmap')
+            for idx in range(num):
+                y, x = np.where(segmap==idx)
+                segment_mean_color = np.sum(np.sum(car_gray[y][:, x], axis=0), axis=0)
+                self.debug.matrix(segment_mean_color, 'segment mean color')
 
 
     def _slic(self, img):
-        segments = img.shape[0] * img.shape[1] / 500
-        segments_slic = slic(img, n_segments=segments, compactness=10, sigma=1)
+        num_segments = int(img.shape[0] * img.shape[1] / 500)
+        segments_slic = slic(img, n_segments=num_segments, compactness=10, sigma=1)
         print('SLIC number of segments: {}'.format(len(np.unique(segments_slic))))
 
         segslic_img = mark_boundaries(img, segments_slic)
         self.debug.img(segslic_img, 'SLIC Segmentation')
-        self.debug.matrix(segments_slic) 
+        self.debug.matrix(segments_slic, 'segments_slic')
+
+        return segments_slic, num_segments
 
