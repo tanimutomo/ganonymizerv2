@@ -46,14 +46,7 @@ class ShadowDetecter:
 
 
         # image with mask superpixel
-        n_segments = img_with_mask.shape[0] * img_with_mask.shape[1] / 500
-        segments_slic = slic(img_with_mask, n_segments=n_segments, compactness=10, sigma=1)
-        print('SLIC number of segments: {}'.format(len(np.unique(segments_slic))))
-
-        segslic_img = mark_boundaries(img_with_mask, segments_slic)
-        self.debug.img(segslic_img, 'SLIC Segmentation')
-
-        self.debug.matrix(segments_slic) 
+        self._slic(img_with_mask)
 
 
         # calcurate the bouding box
@@ -94,5 +87,16 @@ class ShadowDetecter:
             self.debug.img(car, 'car part')
             cars.append(car)
 
+        for car in cars:
+            self._slic(car)
 
+
+    def _slic(self, img):
+        segments = img.shape[0] * img.shape[1] / 500
+        segments_slic = slic(img, n_segments=segments, compactness=10, sigma=1)
+        print('SLIC number of segments: {}'.format(len(np.unique(segments_slic))))
+
+        segslic_img = mark_boundaries(img, segments_slic)
+        self.debug.img(segslic_img, 'SLIC Segmentation')
+        self.debug.matrix(segments_slic) 
 
