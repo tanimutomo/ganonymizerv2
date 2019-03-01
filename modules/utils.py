@@ -51,8 +51,9 @@ class Debugger:
             cv2.imwrite(path, img)
 
 
-    def matrix(self, mat):
+    def matrix(self, mat, comment):
         if self.debug:
+            print('-----', comment, '-----')
             try:
                 if len(mat.shape) == 1 or mat.shape[0] == 1:
                     print(mat)
