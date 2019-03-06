@@ -2,7 +2,7 @@ import os
 import cv2
 import torch
 
-from modules.model import GANonymizer
+from modules.ganonymizer import GANonymizer
 from modules.utils import Debugger, set_networks, labels
 
 
@@ -19,7 +19,13 @@ def main(img, config, debug=False, save=False):
 if __name__ == '__main__':
     img = os.path.join(os.getcwd(), 'data/examples/example_01.jpg')
     config = {
-            'resnet': 18
+            # segmentation
+            'semseg': 'DeepLabV3',
+            'resnet': 18,
+
+            # inpaint
+            'inpaint': 'EdgeConnect',
+            'checkpoints_path': 'modules/edge_connect/checkpoints'
             }
 
     main(img, config, debug=False, save=False)
