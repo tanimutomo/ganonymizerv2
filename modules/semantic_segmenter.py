@@ -9,23 +9,22 @@ class SemanticSegmenter():
         self.device = device
         self.debugger = debugger
 
-
-    def process(self, img)
-        # semantic segmentation
         if self.network == 'DeepLabV3':
-            model = self._set_deeplabv3()
+            self.model = self._set_deeplabv3()
         else:
             raise RuntimeError('Please prepare {} model in modules/ .'.format(self.network))
-        semseg_map = model(img)
+
+
+    def process(self, img):
+        # semantic segmentation
+        semseg_map = self.model(img)
         self.debugger.img(semseg_map, 'Semantic Segmentation Map Prediction by DeepLabV3')
-        with open('./data/exp/segmap.pkl', mode='wb') as f:
-            pickle.dump(semseg_map, f)
         # cv2.imwrite('data/exp/segmaps/segmap_' + img_path.split('/')[-1], semseg_map)
 
         return semseg_map
 
 
-    def _set_deeplabv3(self, resnet):
+    def _set_deeplabv3(self):
         weights = os.path.join(os.getcwd(),
                 'modules/deeplabv3/pretrained/model_13_2_2_2_epoch_580.pth')
         resnet_root = os.path.join(os.getcwd(),
