@@ -27,8 +27,14 @@ class Inpainter():
 
 if __name__ == '__main__':
     config = {
-            'checkpoints_path': 'checkpoints',
-            'inpaint_network': 'EdgeConnect'
+            # segmentation
+            'semseg': 'DeepLabV3',
+            'resnet': 18,
+
+            # inpaint
+            'inpaint': 'EdgeConnect',
+            'checkpoints_path': 'modules/edge_connect/checkpoints',
+            'sigma': 2
             }
     device = torch.device('cpu')
     debugger = Debugger(True, False)
