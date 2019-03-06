@@ -66,25 +66,30 @@ class Debugger:
                 img = img.cpu().numpy().astype(np.uint8)
                 img = Image.fromarray(img)
                 img.save(path)
-            elif type(img) is numpy.ndarray:
+            elif type(img) is np.ndarray:
                 cv2.imwrite(path, img)
             else:
                 raise RuntimeError('The type of input image must be numpy.ndarray or torch.Tensor.')
 
 
-    def matrix(self, mat, comment, device=False):
+    def matrix(self, mat, comment):
         if self.debug:
             print('-----', comment, '-----')
-            try:
-                if device:
+            # try:
+            if type(mat) is torch.Tensor:
+                if 'float' in str(mat.dtype):
                     print('shape: {}   dtype: {}   min: {}   mean: {}   max: {}   device: {}'.format(
                         mat.shape, mat.dtype, mat.min(), mat.mean(), mat.max(), mat.device))
                 else:
-                    print('shape: {}   dtype: {}   min: {}   mean: {}   max: {}'.format(
-                        mat.shape, mat.dtype, mat.min(), mat.mean(), mat.max()))
-            except:
-                print(mat)
-            print('------{}------'.format(''.join(['-' for _ in range(len(comment))])))
+                    print('shape: {}   dtype: {}   min: {}   mean: {}   max: {}   device: {}'.format(
+                        mat.shape, mat.dtype, mat.min(), mat.to(torch.float32).mean(), mat.max(), mat.device))
+
+            elif type(mat) is np.ndarray:
+                print('shape: {}   dtype: {}   min: {}   mean: {}   max: {}'.format(
+                    mat.shape, mat.dtype, mat.min(), mat.mean(), mat.max()))
+            # except:
+            #     print(mat)
+            print('-' * (len(comment) + 10))
 
 
 class AverageMeter:
