@@ -4,6 +4,7 @@ import pickle
 from PIL import Image
 from .semantic_segmenter import SemanticSegmenter
 from .shadow_detecter import ShadowDetecter
+from .inpainter import Inpainter
 
 class GANonymizer:
     def __init__(self, config, device, labels, debugger):
@@ -12,7 +13,7 @@ class GANonymizer:
 
         self.semseger = SemanticSegmenter(config, device, debugger)
         self.shadow_detecter = ShadowDetecter(debugger)
-        # self.inpainter = inpainter
+        self.inpainter = Inpainter(config, device, debugger)
 
         self.labels = labels
         self.debugger = debugger
