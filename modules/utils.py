@@ -19,6 +19,12 @@ def set_networks(DeepLabV3, resnet, device):
     return semseger
 
 
+def tensor_img_to_numpy(tensor):
+    array = tensor.numpy()
+    array = np.transpose(array, (1, 2, 0))
+    return array
+
+
 class Debugger:
     def __init__(self, debug, save, output_dir=None):
         self.debug = debug
@@ -29,6 +35,9 @@ class Debugger:
     def img(self, img, comment, gray=False):
         if self.debug:
             print(comment)
+            if type(img) is torch.Tensor and len(list(img.shape)) == 3:
+                img = tensor_img_to_numpy(img)
+                
             plt.figure(figsize=(10, 10), dpi=200)
             plt.imshow(img)
             if gray:
