@@ -40,10 +40,15 @@ class SimpleEdgeConnect():
         random.seed(config.SEED)
 
 
-    def inpaint(self, path):
-        # for dev
-        img, gray, mask, edge = self._load_inputs(path, self.sigma)
-        img, gray, mask, edge = self._cuda(img, gray, mask, edge)
+    def inpaint(self, img, mask):
+        # img and mask is np.ndarray
+        gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+        edge = self._get_edge(gray, mask)
+        for item, name in [(img, 'img'), (mask, 'mask'), (gray, 'gray'), (edge, 'edge')]:
+            self.debugger.matrix(item, name)
+        img, gray, mask, edge = self._cuda_tensor(img, gray, mask, edge)
+        for item, name in [(img, 'img'), (mask, 'mask'), (gray, 'gray'), (edge, 'edge')]:
+            self.debugger.matrix(item, name)
 
         # inpaint with edge model / joint model
         edge = self.edge_model(gray, edge, mask).detach()
@@ -52,26 +57,38 @@ class SimpleEdgeConnect():
 
         output = self._postprocess(output_merged)[0]
 
-        self.debugger.imsave(output, os.path.join(self.checkpoints_path,
-            'exp/outputs', path.split('/')[-1]))
+        return output
 
 
-    def _inputs(self, path):
-        to_tensor = transforms.ToTensor()
-        path_dir = path.split('/')[:-1]
-        fname, fext = path.split('/')[-1].split('.')
-        inputs = []
-        for item in ['', '_gray', '_edge', '_mask']:
-            path = os.path.join(*path_dir, fname + item + '.' + fext)
-            img = Image.open(path)
-            # img = img.resize((264, 264))
-            img = to_tensor(img).unsqueeze(0)
-            inputs.append(img.to(torch.float32))
+    def _get_edge(self, gray, mask):
+        gray = (np.array(gray) / 255).astype(np.bool)
+        mask = (np.array(mask) / 255).astype(np.bool)
+        edge = canny(gray, sigma=self.sigma, mask=mask)
 
-        return inputs
+        return edge * 255
 
 
-    def _load_inputs(self, path, sigma):
+    def _cuda_tensor(self, *args):
+        items = []
+        for item in args:
+            item = torch.from_numpy(item / 255.0)
+            if len(list(item.shape)) == 3:
+                item = item.permute(2, 0, 1)
+            else:
+                item = item.unsqueeze(0)
+            items.append(item.unsqueeze(0).to(
+                torch.float32).to(self.device))
+        return items
+
+
+    def _postprocess(self, img):
+        # [0, 1] => [0, 255]
+        img = img * 255.0
+        img = img.permute(0, 2, 3, 1)
+        return img.int()
+
+
+    def _load_inputs_from_path(self, path, sigma):
         # path
         path_dir = path.split('/')[:-1]
         fname, fext = path.split('/')[-1].split('.')
@@ -90,25 +107,5 @@ class SimpleEdgeConnect():
         mask = to_tensor(mask).unsqueeze(0).to(torch.float32)
 
         return img, gray, mask, edge
-
-
-    def _get_edge(self, gray, mask, sigma):
-        gray = (np.array(gray) / 255).astype(np.bool)
-        mask = (np.array(mask) / 255).astype(np.bool)
-        edge = canny(gray, sigma=sigma, mask=mask).astype(np.float32)
-        edge = torch.from_numpy(edge).unsqueeze(0).unsqueeze(0)
-
-        return edge
-
-
-    def _cuda(self, *args):
-        return (item.to(self.device) for item in args)
-
-
-    def _postprocess(self, img):
-        # [0, 1] => [0, 255]
-        img = img * 255.0
-        img = img.permute(0, 2, 3, 1)
-        return img.int()
 
 

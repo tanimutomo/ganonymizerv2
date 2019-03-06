@@ -1,28 +1,34 @@
 import cv2
 import torch
 import pickle
+import numpy as np
 from PIL import Image
+from torchvision.transforms import ToTensor, ToPILImage
 from .semantic_segmenter import SemanticSegmenter
 from .shadow_detecter import ShadowDetecter
 from .inpainter import Inpainter
+from .utils import tensor_img_to_numpy
 
 class GANonymizer:
     def __init__(self, config, device, labels, debugger):
         self.config = config
         self.devide = device
+        self.labels = labels
+
+        self.to_tensor = ToTensor()
 
         self.semseger = SemanticSegmenter(config, device, debugger)
         self.shadow_detecter = ShadowDetecter(debugger)
         self.inpainter = Inpainter(config, device, debugger)
 
-        self.labels = labels
         self.debugger = debugger
     
     
     def predict(self, img_path):
         # Loading input image
-        img = cv2.imread(img_path)
-        img = img[:, :, ::-1]
+        img = Image.open(img_path)
+        img = np.array(img)
+        self.debugger.matrix(img, 'Input Image')
         self.debugger.img(img, 'Input Image')
 
         # semantic segmentation
@@ -35,14 +41,14 @@ class GANonymizer:
         # shadow detection
         # with open('./data/exp/segmap.pkl', mode='rb') as f:
         #     semseg_map = pickle.load(f)
-        shadow_map = self.shadow_detecter.detect(img, semseg_map, self.labels)
-        # self.debugger.img(shadow_map, 'Predicted Shadow Map')
-
-        # create mask image
-        # mask = self._get_mask(img, semseg_map, shadowmap)
-        # self.debugger.img(mask, 'Predicted Shadow Map')
+        mask = self.shadow_detecter.detect(img, semseg_map, self.labels)
+        self.debugger.matrix(img, 'img')
+        self.debugger.matrix(mask, 'mask')
 
         # inpainter
+        output = self.inpainter.inpaint(img, mask)
+        self.debugger.matrix(output, 'output')
+        self.debugger.img(output, 'inpainted image')
         
         
 

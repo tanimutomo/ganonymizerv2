@@ -10,12 +10,12 @@ class Inpainter():
         self.device = device
         self.debugger = debugger
 
-        if self.config['inpaint_network'] == 'EdgeConnect':
+        if self.config['inpaint'] == 'EdgeConnect':
             self.model = self._set_edge_connect()
 
 
-    def inpaint(self, img):
-        self.model.inpaint(img)
+    def inpaint(self, img, mask):
+        output = self.model.inpaint(img, mask)
         # model.inpaint(self.config['checkpoints_path'], '/exp/inputs/places2_01.png')
 
 

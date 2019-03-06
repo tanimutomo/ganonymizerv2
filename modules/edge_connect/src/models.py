@@ -59,13 +59,16 @@ class EdgeModel(BaseModel):
 
         # generator input: [grayscale(1) + edge(1) + mask(1)]
         # discriminator input: (grayscale(1) + edge(1))
-        generator = EdgeGenerator(use_spectral_norm=True)
-        discriminator = Discriminator(in_channels=2, use_sigmoid=config.GAN_LOSS != 'hinge')
-        # if len(config.GPU)>1:
-        #     generator = nn.DataParallel(generator, config.GPU)
-        #     discriminator = nn.DataParallel(discriminator, config.GPU)
+        self.generator = EdgeGenerator(use_spectral_norm=True)
+
+    
+    def set_train(self):
+        discriminator = Discriminator(in_channels=2, use_sigmoid=self.config.GAN_LOSS != 'hinge')
+        # if len(self.config.GPU)>1:
+        #     generator = nn.DataParallel(generator, self.config.GPU)
+        #     discriminator = nn.DataParallel(discriminator, self.config.GPU)
         l1_loss = nn.L1Loss()
-        adversarial_loss = AdversarialLoss(type=config.GAN_LOSS)
+        adversarial_loss = AdversarialLoss(type=self.config.GAN_LOSS)
 
         self.add_module('generator', generator)
         self.add_module('discriminator', discriminator)
@@ -75,13 +78,13 @@ class EdgeModel(BaseModel):
 
         self.gen_optimizer = optim.Adam(
             params=generator.parameters(),
-            lr=float(config.LR),
-            betas=(config.BETA1, config.BETA2)
+            lr=float(self.config.LR),
+            betas=(self.config.BETA1, self.config.BETA2)
         )
 
         self.dis_optimizer = optim.Adam(
             params=discriminator.parameters(),
-            lr=float(config.LR) * float(config.D2G_LR),
+            lr=float(self.config.LR) * float(self.config.D2G_LR),
             betas=(config.BETA1, config.BETA2)
         )
 
@@ -157,16 +160,19 @@ class InpaintingModel(BaseModel):
 
         # generator input: [rgb(3) + edge(1)]
         # discriminator input: [rgb(3)]
-        generator = InpaintGenerator()
-        discriminator = Discriminator(in_channels=3, use_sigmoid=config.GAN_LOSS != 'hinge')
-        # if len(config.GPU) > 1:
-        #     generator = nn.DataParallel(generator, config.GPU)
-        #     discriminator = nn.DataParallel(discriminator , config.GPU)
+        self.generator = InpaintGenerator()
+
+
+    def set_train(self):
+        discriminator = Discriminator(in_channels=3, use_sigmoid=self.config.GAN_LOSS != 'hinge')
+        # if len(self.config.GPU) > 1:
+        #     generator = nn.DataParallel(generator, self.config.GPU)
+        #     discriminator = nn.DataParallel(discriminator , self.config.GPU)
 
         l1_loss = nn.L1Loss()
         perceptual_loss = PerceptualLoss()
         style_loss = StyleLoss()
-        adversarial_loss = AdversarialLoss(type=config.GAN_LOSS)
+        adversarial_loss = AdversarialLoss(type=self.config.GAN_LOSS)
 
         self.add_module('generator', generator)
         self.add_module('discriminator', discriminator)
@@ -178,14 +184,14 @@ class InpaintingModel(BaseModel):
 
         self.gen_optimizer = optim.Adam(
             params=generator.parameters(),
-            lr=float(config.LR),
-            betas=(config.BETA1, config.BETA2)
+            lr=float(self.config.LR),
+            betas=(self.config.BETA1, self.config.BETA2)
         )
 
         self.dis_optimizer = optim.Adam(
             params=discriminator.parameters(),
-            lr=float(config.LR) * float(config.D2G_LR),
-            betas=(config.BETA1, config.BETA2)
+            lr=float(self.config.LR) * float(self.config.D2G_LR),
+            betas=(self.config.BETA1, self.config.BETA2)
         )
 
     def process(self, images, edges, masks):
