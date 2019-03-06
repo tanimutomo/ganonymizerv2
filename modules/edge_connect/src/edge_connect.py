@@ -23,7 +23,6 @@ class SimpleEdgeConnect():
 
         # Model setting and forward
         # build the model and initialize
-        print('device:', device)
         self.edge_model = EdgeModel(config).to(device)
         self.inpaint_model = InpaintingModel(config).to(device)
         self.edge_model.load()
@@ -53,7 +52,8 @@ class SimpleEdgeConnect():
 
         output = self._postprocess(output_merged)[0]
 
-        self.debugger.imsave(output, os.path.join(self.checkpoints_path, 'exp/outputs', path.split('/')[-1]))
+        self.debugger.imsave(output, os.path.join(self.checkpoints_path,
+            'exp/outputs', path.split('/')[-1]))
 
 
     def _inputs(self, path):
