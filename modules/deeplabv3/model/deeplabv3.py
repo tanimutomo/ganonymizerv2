@@ -66,9 +66,9 @@ class DeepLabV3(nn.Module):
     
     def _preprocess(self, img):
         # normalize the img (with mean and std for the pretrained ResNet):
-        img = img/255.0
+        img = img / 255.0
         img = img - np.array([0.485, 0.456, 0.406])
-        img = img/np.array([0.229, 0.224, 0.225]) # (shape: (512, 1024, 3))
+        img = img / np.array([0.229, 0.224, 0.225]) # (shape: (512, 1024, 3))
         img = np.transpose(img, (2, 0, 1)) # (shape: (3, 512, 1024))
         img = img.astype(np.float32)
 

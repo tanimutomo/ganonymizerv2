@@ -19,15 +19,25 @@ def set_networks(DeepLabV3, resnet, device):
     return semseger
 
 
+def tensor_img_to_numpy(tensor):
+    array = tensor.numpy()
+    array = np.transpose(array, (1, 2, 0))
+    return array
+
+
 class Debugger:
-    def __init__(self, debug, save):
+    def __init__(self, debug, save, output_dir=None):
         self.debug = debug
         self.save = save
         self.order = 0
+        self.output_dir = output_dir
 
     def img(self, img, comment, gray=False):
         if self.debug:
             print(comment)
+            if type(img) is torch.Tensor and len(list(img.shape)) == 3:
+                img = tensor_img_to_numpy(img)
+                
             plt.figure(figsize=(10, 10), dpi=200)
             plt.imshow(img)
             if gray:
@@ -35,10 +45,13 @@ class Debugger:
             plt.show()
 
             if self.save:
-                filepath = os.path.join('../data/output', str(self.order) 
-                        + '_' + comment[:5] + '.png')
-                self.imsave(filepath, img)
-                self.order += 1
+                if self.output_dir is None:
+                    raise RuntimeError('Please specify output directory for saving images')
+                else:
+                    filepath = os.path.join(self.output_dir, str(self.order) 
+                            + '_' + comment[:5] + '.png')
+                    self.imsave(img, filepath)
+                    self.order += 1
 
 
     def param(self, string):
@@ -46,22 +59,37 @@ class Debugger:
             print(string)
 
 
-    def imsave(self, path, img):
-        if self.save:
-            cv2.imwrite(path, img)
+    def imsave(self, img, path):
+        if self.debug:
+            print(img.shape)
+            if type(img) is torch.Tensor:
+                img = img.cpu().numpy().astype(np.uint8)
+                img = Image.fromarray(img)
+                img.save(path)
+            elif type(img) is np.ndarray:
+                cv2.imwrite(path, img)
+            else:
+                raise RuntimeError('The type of input image must be numpy.ndarray or torch.Tensor.')
 
 
     def matrix(self, mat, comment):
         if self.debug:
             print('-----', comment, '-----')
-            try:
-                if len(mat.shape) == 1 or mat.shape[0] == 1:
-                    print(mat)
+            # try:
+            if type(mat) is torch.Tensor:
+                if 'float' in str(mat.dtype):
+                    print('shape: {}   dtype: {}   min: {}   mean: {}   max: {}   device: {}'.format(
+                        mat.shape, mat.dtype, mat.min(), mat.mean(), mat.max(), mat.device))
                 else:
-                    print(mat.shape, mat.dtype, mat.min(), mat.mean(), mat.max())
-            except:
-                print(mat)
-            print('-------------------')
+                    print('shape: {}   dtype: {}   min: {}   mean: {}   max: {}   device: {}'.format(
+                        mat.shape, mat.dtype, mat.min(), mat.to(torch.float32).mean(), mat.max(), mat.device))
+
+            elif type(mat) is np.ndarray:
+                print('shape: {}   dtype: {}   min: {}   mean: {}   max: {}'.format(
+                    mat.shape, mat.dtype, mat.min(), mat.mean(), mat.max()))
+            # except:
+            #     print(mat)
+            print('-' * (len(comment) + 10))
 
 
 class AverageMeter:

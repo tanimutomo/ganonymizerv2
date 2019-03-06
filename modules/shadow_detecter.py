@@ -12,16 +12,19 @@ class ShadowDetecter:
     def detect(self, img, segmap, labels):
         img_edges = cv2.Canny(img, 100, 200, L2gradient=True)
         self.debug.matrix(img_edges, 'img_edges')
-        self.debug.img(img_edges, 'image edges', gray=True)
+        # self.debug.img(img_edges, 'image edges', gray=True)
         # segmap_edges = cv2.Canny(segmap, 10, 20, L2gradient=True)
         # self.debug.matrix(segmap_edges)
         # self.debug.img(segmap_edges, 'segmap_edges')
 
-        print(labels[26].name)
-        print(labels[26].trainId)
+        # print(labels[26].name)
+        # print(labels[26].trainId)
 
         car_map = np.where(segmap==labels[26].trainId, 255, 0)
         self.debug.img(car_map, 'car map', gray=True)
+
+        # return torch.from_numpy((car_map / 255).astype(np.float32))
+        return car_map
 
         out = np.where(car_map==255, 0, img_edges)
         # self.debug.img(out, 'edge without car')
