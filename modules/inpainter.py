@@ -17,12 +17,12 @@ class Inpainter():
     def inpaint(self, img, mask):
         output = self.model.inpaint(img, mask)
         # model.inpaint(self.config['checkpoints_path'], '/exp/inputs/places2_01.png')
+        return output
 
 
     def _set_edge_connect(self):
-        sigma = 2
         model = SimpleEdgeConnect(
-                self.config['checkpoints_path'], sigma, self.device, self.debugger)
+                self.config['checkpoints_path'], self.config['sigma'], self.device, self.debugger)
         return model
 
 
