@@ -20,10 +20,11 @@ def set_networks(DeepLabV3, resnet, device):
 
 
 class Debugger:
-    def __init__(self, debug, save):
+    def __init__(self, debug, save, output_dir=None):
         self.debug = debug
         self.save = save
         self.order = 0
+        self.output_dir = output_dir
 
     def img(self, img, comment, gray=False):
         if self.debug:
@@ -35,10 +36,13 @@ class Debugger:
             plt.show()
 
             if self.save:
-                filepath = os.path.join('../data/output', str(self.order) 
-                        + '_' + comment[:5] + '.png')
-                self.imsave(filepath, img)
-                self.order += 1
+                if self.output_dir is None:
+                    raise RuntimeError('Please specify output directory for saving images')
+                else:
+                    filepath = os.path.join(self.output_dir, str(self.order) 
+                            + '_' + comment[:5] + '.png')
+                    self.imsave(img, filepath)
+                    self.order += 1
 
 
     def param(self, string):
@@ -46,22 +50,32 @@ class Debugger:
             print(string)
 
 
-    def imsave(self, path, img):
-        if self.save:
-            cv2.imwrite(path, img)
+    def imsave(self, img, path):
+        if self.debug:
+            print(img.shape)
+            if type(img) is torch.Tensor:
+                img = img.cpu().numpy().astype(np.uint8)
+                img = Image.fromarray(img)
+                img.save(path)
+            elif type(img) is numpy.ndarray:
+                cv2.imwrite(path, img)
+            else:
+                raise RuntimeError('The type of input image must be numpy.ndarray or torch.Tensor.')
 
 
-    def matrix(self, mat, comment):
+    def matrix(self, mat, comment, device=False):
         if self.debug:
             print('-----', comment, '-----')
             try:
-                if len(mat.shape) == 1 or mat.shape[0] == 1:
-                    print(mat)
+                if device:
+                    print('shape: {}   dtype: {}   min: {}   mean: {}   max: {}   device: {}'.format(
+                        mat.shape, mat.dtype, mat.min(), mat.mean(), mat.max(), mat.device))
                 else:
-                    print(mat.shape, mat.dtype, mat.min(), mat.mean(), mat.max())
+                    print('shape: {}   dtype: {}   min: {}   mean: {}   max: {}'.format(
+                        mat.shape, mat.dtype, mat.min(), mat.mean(), mat.max()))
             except:
                 print(mat)
-            print('-------------------')
+            print('------{}------'.format(''.join(['-' for _ in range(len(comment))])))
 
 
 class AverageMeter:
