@@ -4,29 +4,23 @@ import torch
 
 from modules.model import GANonymizer
 from modules.utils import Debugger, set_networks, labels
-from modules.shadow_detecter import ShadowDetecter
 
 
-def main(img, params, debug=False, save=False):
+def main(img, config, debug=False, save=False):
     # setup environment
     debugger = Debugger(debug, save)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # setup models
-    semseger = set_networks(DeepLabV3, params['resnet'], device)
-    shadow_detecter = ShadowDetecter(debugger)
-    inpainter = None
-
     # model prediction
-    model = GANonymizer(params, device, semseger, inpainter, shadow_detecter, labels, debugger)
+    model = GANonymizer(config, device, labels, debugger)
     model.predict(img)
 
 
 if __name__ == '__main__':
     img = os.path.join(os.getcwd(), 'data/examples/example_01.jpg')
-    params = {
+    config = {
             'resnet': 18
             }
 
-    main(img, params, debug=False, save=False)
+    main(img, config, debug=False, save=False)
 
