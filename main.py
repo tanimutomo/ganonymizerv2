@@ -3,7 +3,6 @@ import cv2
 import torch
 
 from modules.model import GANonymizer
-from modules.deeplabv3.model.deeplabv3 import DeepLabV3
 from modules.utils import Debugger, set_networks, labels
 from modules.shadow_detecter import ShadowDetecter
 
