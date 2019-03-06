@@ -55,7 +55,7 @@ class SimpleEdgeConnect():
         output = self.inpaint_model(img, edge, mask)
         output_merged = (output * mask) + (img * (1 - mask))
 
-        output = self._postprocess(output_merged)[0]
+        output = self._postprocess(output_merged)
 
         return output
 
@@ -84,8 +84,9 @@ class SimpleEdgeConnect():
     def _postprocess(self, img):
         # [0, 1] => [0, 255]
         img = img * 255.0
-        img = img.permute(0, 2, 3, 1)
-        return img.int()
+        img = img.permute(0, 2, 3, 1).squeeze()
+        img = img.detach().cpu().numpy().astype(np.uint8)
+        return img
 
 
     def _load_inputs_from_path(self, path, sigma):
