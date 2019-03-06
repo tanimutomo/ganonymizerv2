@@ -1,10 +1,11 @@
 import os
 import torch
 from .deeplabv3.model.deeplabv3 import DeepLabV3
+from .utils import tensor_img_to_numpy
 
 class SemanticSegmenter():
     def __init__(self, config, device, debugger):
-        self.network = config['semseg_net']
+        self.network = config['semseg']
         self.resnet = config['resnet']
         self.device = device
         self.debugger = debugger
@@ -18,8 +19,6 @@ class SemanticSegmenter():
     def process(self, img):
         # semantic segmentation
         semseg_map = self.model(img)
-        self.debugger.img(semseg_map, 'Semantic Segmentation Map Prediction by DeepLabV3')
-        # cv2.imwrite('data/exp/segmaps/segmap_' + img_path.split('/')[-1], semseg_map)
 
         return semseg_map
 
