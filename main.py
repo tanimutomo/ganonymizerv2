@@ -24,7 +24,7 @@ if __name__ == '__main__':
         
             # mode
             'semseg_mode': 'save',
-            'shadow_mode': 'save',
+            'mask_mode': 'save',
             'inpaint_mode': 'save',
         
             # segmentation
