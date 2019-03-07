@@ -5,26 +5,29 @@ from skimage.segmentation import felzenszwalb, slic
 from skimage.segmentation import mark_boundaries
 
 class ShadowDetecter:
-    def __init__(self, debug):
-        self.debug = debug
+    def __init__(self, debugger):
+        self.debugger = debugger
 
     
     def detect(self, img, segmap, labels):
-        img_edges = cv2.Canny(img, 100, 200, L2gradient=True)
-        self.debug.matrix(img_edges, 'img_edges')
-        # self.debug.img(img_edges, 'image edges', gray=True)
-        # segmap_edges = cv2.Canny(segmap, 10, 20, L2gradient=True)
-        # self.debug.matrix(segmap_edges)
-        # self.debug.img(segmap_edges, 'segmap_edges')
+        # img_edges = cv2.Canny(img, 100, 200, L2gradient=True)
+        # self.debug.matrix(img_edges, 'img_edges')
 
-        # print(labels[26].name)
-        # print(labels[26].trainId)
+        # collect dynamic object's id
+        dynamic_object_ids = []
+        for label in labels:
+            if label.category is 'vehicle' and label.trainId is not 19:
+                dynamic_object_ids.append(label.trainId)
 
-        car_map = np.where(segmap==labels[26].trainId, 255, 0).astype(np.uint8)
-        # self.debug.img(car_map, 'car map', gray=True)
+        # create the mask image using only segmap
+        obj_mask = segmap.copy()
+        for do_id in dynamic_object_ids:
+            obj_mask = np.where(obj_mask==do_id, 255, obj_mask).astype(np.uint8)
+        obj_mask = np.where(obj_mask==255, 255, 0)
 
-        # return torch.from_numpy((car_map / 255).astype(np.float32))
-        return car_map
+        self.debugger.img(obj_mask, 'Mask Image based on only segmap', gray=True)
+
+        return obj_mask.astype(np.uint8)
 
         out = np.where(car_map==255, 0, img_edges)
         # self.debug.img(out, 'edge without car')
