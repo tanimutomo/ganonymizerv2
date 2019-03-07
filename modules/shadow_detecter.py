@@ -20,8 +20,8 @@ class ShadowDetecter:
         # print(labels[26].name)
         # print(labels[26].trainId)
 
-        car_map = np.where(segmap==labels[26].trainId, 255, 0)
-        self.debug.img(car_map, 'car map', gray=True)
+        car_map = np.where(segmap==labels[26].trainId, 255, 0).astype(np.uint8)
+        # self.debug.img(car_map, 'car map', gray=True)
 
         # return torch.from_numpy((car_map / 255).astype(np.float32))
         return car_map
