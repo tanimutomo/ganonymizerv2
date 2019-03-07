@@ -58,23 +58,28 @@ class GANonymizer:
 
         # shadow detection
         print('----- Shadow Detection and Creating Mask Image -----')
-        shadow_path = os.path.join(self.config['checkpoint'], fname + '_shadow' + 'pkl')
+        mask_path = os.path.join(self.config['checkpoint'], fname + '_mask' + 'pkl')
+        img_with_mask_path = os.path.join(self.config['checkpoint'], fname + '_img_with_mask' + 'pkl')
 
         if self.config['shadow_mode'] is 'exec':
-            mask = self.shadow_detecter.detect(img, semseg_map, self.labels)
-            mask = self._expand_mask(mask)
+            mask, img_with_mask = self.shadow_detecter.detect(img, semseg_map, self.labels)
         elif self.config['shadow_mode'] is 'pass':
-            with open(shadow_path, mode='rb') as f:
+            with open(mask_path, mode='rb') as f:
                 mask = pickle.load(f)
+            with open(img_with_mask_path, mode='rb') as f:
+                img_with_mask = pickle.load(f)
         elif self.config['shadow_mode'] is 'save':
-            mask = self.shadow_detecter.detect(img, semseg_map, self.labels)
-            mask = self._expand_mask(mask)
-            with open(shadow_path, mode='wb') as f:
+            mask, img_with_mask = self.shadow_detecter.detect(img, semseg_map, self.labels)
+            with open(mask_path, mode='wb') as f:
                 pickle.dump(mask, f)
+            with open(img_with_mask_path, mode='wb') as f:
+                pickle.dump(img_with_mask, f)
 
         # visualization
         self.debugger.matrix(mask, 'mask')
         self.debugger.img(mask, 'mask', gray=True)
+        self.debugger.matrix(img_with_mask, 'img_with_mask')
+        self.debugger.img(img_with_mask, 'img_with_mask')
 
 
         # inpainter
@@ -83,14 +88,14 @@ class GANonymizer:
         inpaint_edge_path = os.path.join(self.config['checkpoint'], fname + '_inpaint_edge' + 'pkl')
 
         if self.config['inpaint_mode'] is 'exec':
-            inpainted, inpainted_edge = self.inpainter.inpaint(img, mask)
+            inpainted, inpainted_edge = self.inpainter.inpaint(img_with_mask, mask)
         elif self.config['inpaint_mode'] is 'pass':
             with open(inpaint_path, mode='rb') as f:
                 inpainted = pickle.load(f)
             with open(inpaint_edge_path, mode='rb') as f:
                 inpainted_edge = pickle.load(f)
         elif self.config['inpaint_mode'] is 'save':
-            inpainted, inpainted_edge = self.inpainter.inpaint(img, mask)
+            inpainted, inpainted_edge = self.inpainter.inpaint(img_with_mask, mask)
             with open(inpaint_path, mode='wb') as f:
                 pickle.dump(inpainted, f)
             with open(inpaint_edge_path, mode='wb') as f:
@@ -102,12 +107,4 @@ class GANonymizer:
         self.debugger.matrix(inpainted, 'Inpainted Image')
         self.debugger.img(inpainted, 'Inpainted Image')
         
-
-    def _expand_mask(self, mask):
-        width = int((mask.shape[0] + mask.shape[1]) / 256)
-        print('width:', width)
-        contours, hierarchy = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-        mask = cv2.drawContours(mask, contours, -1, 255, width) 
-        
-        return mask
 

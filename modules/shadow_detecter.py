@@ -25,17 +25,21 @@ class ShadowDetecter:
             obj_mask = np.where(obj_mask==do_id, 255, obj_mask).astype(np.uint8)
         obj_mask = np.where(obj_mask==255, 255, 0)
 
+        # expnad mask area by contours
+        obj_mask = self._expand_mask(obj_mask)
+
+        # visualization
+        self.debugger.matrix(obj_mask, 'Mask Image based on only segmap')
         self.debugger.img(obj_mask, 'Mask Image based on only segmap', gray=True)
 
-        return obj_mask.astype(np.uint8)
+        # image with mask
+        obj_mask_3c = np.stack([obj_mask for _ in range(3)], axis=-1)
+        img_with_mask = np.where(obj_mask_3c==255, obj_mask_3c, img).astype(np.uint8)
+        self.debugger.img(img_with_mask, 'Image with Mask')
+        self.debugger.matrix(img_with_mask, 'image with mask')
 
-        out = np.where(car_map==255, 0, img_edges)
-        # self.debug.img(out, 'edge without car')
+        return obj_mask.astype(np.uint8), img_with_mask.astype(np.uint8)
 
-        car_map_3c = np.stack([car_map for _ in range(3)], axis=-1)
-        img_with_mask = np.where(car_map_3c==255, car_map_3c, img).astype(np.uint8)
-        self.debug.img(img_with_mask, 'Image with Mask')
-        self.debug.matrix(img_with_mask, 'image with mask')
 
         # image with mask superpixel
         _, _ = self._slic(img_with_mask)
@@ -107,4 +111,14 @@ class ShadowDetecter:
         self.debug.matrix(segments_slic, 'segments_slic')
 
         return segments_slic, num_segments
+
+
+    def _expand_mask(self, mask):
+        mask = mask.astype(np.uint8)
+        width = int((mask.shape[0] + mask.shape[1]) / 256)
+        self.debugger.param(width, 'mask expand width')
+        contours, hierarchy = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        mask = cv2.drawContours(mask, contours, -1, 255, width) 
+        
+        return mask.astype(np.uint8)
 
