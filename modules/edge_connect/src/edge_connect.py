@@ -46,23 +46,25 @@ class SimpleEdgeConnect():
         edge = self._get_edge(gray, mask)
         for item, name in [(img, 'img'), (mask, 'mask'), (gray, 'gray'), (edge, 'edge')]:
             self.debugger.matrix(item, name)
+            self.debugger.img(item, name)
         img, gray, mask, edge = self._cuda_tensor(img, gray, mask, edge)
         for item, name in [(img, 'img'), (mask, 'mask'), (gray, 'gray'), (edge, 'edge')]:
             self.debugger.matrix(item, name)
 
         # inpaint with edge model / joint model
-        edge = self.edge_model(gray, edge, mask).detach()
+        out_edge = self.edge_model(gray, edge, mask).detach()
         output = self.inpaint_model(img, edge, mask)
         output_merged = (output * mask) + (img * (1 - mask))
 
+        out_edge = self._postprocess(out_edge)
         output = self._postprocess(output_merged)
 
-        return output
+        return output, out_edge
 
 
     def _get_edge(self, gray, mask):
-        gray = (np.array(gray) / 255).astype(np.bool)
-        mask = (np.array(mask) / 255).astype(np.bool)
+        gray = (np.array(gray)).astype(np.uint8)
+        mask = (1 - np.array(mask) / 255).astype(np.bool)
         edge = canny(gray, sigma=self.sigma, mask=mask)
 
         return edge * 255
