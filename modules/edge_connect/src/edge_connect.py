@@ -45,8 +45,10 @@ class SimpleEdgeConnect():
         gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
         edge = self._get_edge(gray, mask)
         for item, name in [(img, 'img'), (mask, 'mask'), (gray, 'gray'), (edge, 'edge')]:
-            self.debugger.matrix(item, name)
-            self.debugger.img(item, name)
+            if len(item.shape) == 3:
+                self.debugger.img(item, name)
+            else:
+                self.debugger.img(item, name, gray=True)
         img, gray, mask, edge = self._cuda_tensor(img, gray, mask, edge)
         for item, name in [(img, 'img'), (mask, 'mask'), (gray, 'gray'), (edge, 'edge')]:
             self.debugger.matrix(item, name)
