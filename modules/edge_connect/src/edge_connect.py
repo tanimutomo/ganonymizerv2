@@ -51,16 +51,15 @@ class SimpleEdgeConnect():
         for item, name in [(img, 'img'), (mask, 'mask'), (gray, 'gray'), (edge, 'edge')]:
             self.debugger.matrix(item, name)
 
-        return None
-
         # inpaint with edge model / joint model
-        edge = self.edge_model(gray, edge, mask).detach()
+        out_edge = self.edge_model(gray, edge, mask).detach()
         output = self.inpaint_model(img, edge, mask)
         output_merged = (output * mask) + (img * (1 - mask))
 
+        out_edge = self._postprocess(out_edge)
         output = self._postprocess(output_merged)
 
-        return output
+        return output, out_edge
 
 
     def _get_edge(self, gray, mask):

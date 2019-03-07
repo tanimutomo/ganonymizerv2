@@ -32,12 +32,12 @@ class GANonymizer:
         self.debugger.img(img, 'Input Image')
 
         # semantic segmentation
-        semseg_map = self.semseger.process(img)
-        self.debugger.img(semseg_map, 'Semantic Segmentation Map Prediction by DeepLabV3')
+        # semseg_map = self.semseger.process(img)
         # with open('./data/exp/segmap.pkl', mode='wb') as f:
         #     pickle.dump(semseg_map, f)
         with open('./data/exp/segmap.pkl', mode='rb') as f:
             semseg_map = pickle.load(f)
+        self.debugger.img(semseg_map, 'Semantic Segmentation Map Prediction by DeepLabV3')
 
         # shadow detection
         mask = self.shadow_detecter.detect(img, semseg_map, self.labels)
@@ -45,9 +45,11 @@ class GANonymizer:
         self.debugger.matrix(mask, 'mask')
 
         # inpainter
-        output = self.inpainter.inpaint(img, mask)
+        output, out_edge = self.inpainter.inpaint(img, mask)
         self.debugger.matrix(output, 'output')
         self.debugger.img(output, 'inpainted image')
+        self.debugger.matrix(out_edge, 'out_edge')
+        self.debugger.img(out_edge, 'inpainted edge')
         
         
 

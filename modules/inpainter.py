@@ -15,9 +15,9 @@ class Inpainter():
 
 
     def inpaint(self, img, mask):
-        output = self.model.inpaint(img, mask)
+        output, out_edge = self.model.inpaint(img, mask)
         # model.inpaint(self.config['checkpoints_path'], '/exp/inputs/places2_01.png')
-        return output
+        return output, out_edge
 
 
     def _set_edge_connect(self):
