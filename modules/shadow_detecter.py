@@ -9,10 +9,7 @@ class ShadowDetecter:
         self.debugger = debugger
 
     
-    def detect(self, img, segmap, labels):
-        # img_edges = cv2.Canny(img, 100, 200, L2gradient=True)
-        # self.debug.matrix(img_edges, 'img_edges')
-
+    def mask(self, img, segmap, labels):
         # collect dynamic object's id
         dynamic_object_ids = []
         for label in labels:
@@ -41,40 +38,37 @@ class ShadowDetecter:
         return obj_mask.astype(np.uint8), img_with_mask.astype(np.uint8)
 
 
-        # image with mask superpixel
-        _, _ = self._slic(img_with_mask)
-
-        # calcurate the bouding box
-        car_map = car_map.astype(np.uint8)
-        self.debug.matrix(car_map, 'car map')
-        contours, _ = cv2.findContours(car_map, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-        bboxes = []
-        out1 = car_map.copy()
-        thresh = 10000
+    def detect(self, img, mask, img_with_mask):
+        contours, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        self.debugger.matrix(contours, 'contours')
         for cnt in contours:
-            x, y, w, h = cv2.boundingRect(cnt)
-            out1 = cv2.rectangle(out1, (x, y), (x+w, y+h), 255, 2)
-            if w*h >= thresh:
-                bboxes.append([x, y, x+w, y+h])
+            self.debugger.matrix(cnt, 'cnt')
+            cnt = np.transpose(np.squeeze(cnt), (1, 0))
+            cnt[:, 0] -= 1
+            cnt_pixel = mask[(cnt)]
+            idx = np.where(cnt_pixel==255)
+            self.debugger.matrix(idx, 'idx')
 
-        self.debug.img(out1, 'car map with bbox')
 
 
+    def old_detect(self, img, mask, img_with_mask):
         # extract bottom part of the image with mask
-        H, W = car_map.shape[0], car_map.shape[1]
-        print(W, H)
+        H, W = mask.shape[0], mask.shape[1]
         for box in bboxes:
             half_w, half_h = int((box[2] - box[0]) / 2), int((box[3] - box[1]) / 2)
             box[0] = box[0] - half_w if box[0] - half_w >= 0 else 0
-            # box[1] = box[1] - half_h if box[1] - half_h >= 0 else 0
+            box[1] = box[1] + half_h if box[1] + half_h < H else H - 2 # half of the car height
             box[2] = box[2] + half_w if box[2] + half_w < W else W - 1
             box[3] = box[3] + half_h if box[3] + half_h < H else H - 1
 
-        out2 = car_map.copy()
+        # check extracted bboxes area
+        tmp = mask.astype(np.uint8).copy()
         for box in bboxes:
-            out2 = cv2.rectangle(out2, (box[0], box[1]), (box[2], box[3]), 255, 2)
+            tmp = cv2.rectangle(tmp, (box[0], box[1]), (box[2], box[3]), 255, 1)
 
+        # visualization
         self.debug.img(out2, 'expanded bounding boxes')
+
 
         cars = []
         for box in bboxes:
@@ -121,4 +115,19 @@ class ShadowDetecter:
         mask = cv2.drawContours(mask, contours, -1, 255, width) 
         
         return mask.astype(np.uint8)
+
+
+    def _get_obj_bbox(self, img):
+        out = img.astype(np.uint8)
+        contours, _ = cv2.findContours(img, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        bboxes = []
+        thresh = 10000
+        for cnt in contours:
+            x, y, w, h = cv2.boundingRect(cnt)
+            out = cv2.rectangle(out, (x, y), (x+w, y+h), 255, 2)
+            if w*h >= thresh:
+                bboxes.append([x, y, x+w, y+h])
+
+        return out, bboxes
+
 
