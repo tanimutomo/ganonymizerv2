@@ -54,9 +54,11 @@ class Debugger:
                     self.order += 1
 
 
-    def param(self, string):
+    def param(self, param, comment):
         if self.debug:
-            print(string)
+            print('-----', comment, '-----')
+            print(param)
+            print('-' * (len(comment) + 12))
 
 
     def imsave(self, img, path):
@@ -75,7 +77,6 @@ class Debugger:
     def matrix(self, mat, comment):
         if self.debug:
             print('-----', comment, '-----')
-            # try:
             if type(mat) is torch.Tensor:
                 if 'float' in str(mat.dtype):
                     print('shape: {}   dtype: {}   min: {}   mean: {}   max: {}   device: {}'.format(
@@ -87,8 +88,6 @@ class Debugger:
             elif type(mat) is np.ndarray:
                 print('shape: {}   dtype: {}   min: {}   mean: {}   max: {}'.format(
                     mat.shape, mat.dtype, mat.min(), mat.mean(), mat.max()))
-            # except:
-            #     print(mat)
             print('-' * (len(comment) + 12))
 
 
