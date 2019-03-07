@@ -36,11 +36,10 @@ class GANonymizer:
         self.debugger.img(semseg_map, 'Semantic Segmentation Map Prediction by DeepLabV3')
         # with open('./data/exp/segmap.pkl', mode='wb') as f:
         #     pickle.dump(semseg_map, f)
-        # cv2.imwrite('data/exp/segmaps/segmap_' + img_path.split('/')[-1], semseg_map)
+        with open('./data/exp/segmap.pkl', mode='rb') as f:
+            semseg_map = pickle.load(f)
 
         # shadow detection
-        # with open('./data/exp/segmap.pkl', mode='rb') as f:
-        #     semseg_map = pickle.load(f)
         mask = self.shadow_detecter.detect(img, semseg_map, self.labels)
         self.debugger.matrix(img, 'img')
         self.debugger.matrix(mask, 'mask')
