@@ -89,7 +89,7 @@ class Debugger:
                     mat.shape, mat.dtype, mat.min(), mat.mean(), mat.max()))
             # except:
             #     print(mat)
-            print('-' * (len(comment) + 10))
+            print('-' * (len(comment) + 12))
 
 
 class AverageMeter:

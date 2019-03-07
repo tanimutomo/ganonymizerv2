@@ -17,16 +17,25 @@ def main(img, config, debug=False, save=False):
 
 
 if __name__ == '__main__':
-    img = os.path.join(os.getcwd(), 'data/examples/example_01.jpg')
+    img = os.path.join(os.getcwd(), 'data/exp/cityscapes_testset/ex_01.png')
     config = {
+            # checkpoint
+            'checkpoint': 'data/exp/cityscapes_testset',
+        
+            # mode
+            'semseg_mode': 'save',
+            'shadow_mode': 'save',
+            'inpaint_mode': 'save',
+        
             # segmentation
             'semseg': 'DeepLabV3',
             'resnet': 18,
 
             # inpaint
             'inpaint': 'EdgeConnect',
-            'checkpoints_path': 'modules/edge_connect/checkpoints'
+            'checkpoints_path': 'modules/edge_connect/checkpoints',
+            'sigma': 2
             }
 
-    main(img, config, debug=False, save=False)
+    main(img, config, debug=True, save=False)
 
