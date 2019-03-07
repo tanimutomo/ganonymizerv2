@@ -51,6 +51,8 @@ class SimpleEdgeConnect():
         for item, name in [(img, 'img'), (mask, 'mask'), (gray, 'gray'), (edge, 'edge')]:
             self.debugger.matrix(item, name)
 
+        return None
+
         # inpaint with edge model / joint model
         edge = self.edge_model(gray, edge, mask).detach()
         output = self.inpaint_model(img, edge, mask)
@@ -62,8 +64,8 @@ class SimpleEdgeConnect():
 
 
     def _get_edge(self, gray, mask):
-        gray = (np.array(gray) / 255).astype(np.bool)
-        mask = (np.array(mask) / 255).astype(np.bool)
+        gray = (np.array(gray)).astype(np.uint8)
+        mask = (1 - np.array(mask) / 255).astype(np.bool)
         edge = canny(gray, sigma=self.sigma, mask=mask)
 
         return edge * 255
