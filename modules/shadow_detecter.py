@@ -39,15 +39,39 @@ class ShadowDetecter:
 
 
     def detect(self, img, mask, img_with_mask):
-        contours, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-        self.debugger.matrix(contours, 'contours')
+        contours, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+        print(contours[2].shape)
+        new_contours = []
         for cnt in contours:
             self.debugger.matrix(cnt, 'cnt')
-            cnt = np.transpose(np.squeeze(cnt), (1, 0))
-            cnt[:, 0] -= 1
-            cnt_pixel = mask[(cnt)]
+            cnt_ = np.squeeze(cnt) # cnt's shape is (num, 2(x, y))
+            self.debugger.matrix(cnt_, 'cnt')
+            cnt_[:, 1] -= 1 # y = y - 1
+            self.debugger.matrix(cnt_, 'cnt')
+            idx = (cnt_[:, 1], cnt_[:, 0]) # (ys, xs)
+            cnt_pixel = mask[(idx)]
+            self.debugger.matrix(cnt_pixel, 'cnt_pixel')
             idx = np.where(cnt_pixel==255)
             self.debugger.matrix(idx, 'idx')
+            self.debugger.matrix(cnt, 'before cnt')
+            cnt = cnt[idx]
+            self.debugger.matrix(cnt, 'after cnt')
+            new_contours.append(cnt)
+            
+        # self.debugger.matrix(new_contours, 'after contours')
+        print(new_contours[2].shape)
+        
+        # width = int((mask.shape[0] + mask.shape[1]) / 25.6)
+        width = 2
+        # mask_with_bottom = cv2.drawContours(mask, new_contours, -1, 127, width) 
+        mask_with_bottom = mask.copy()
+        for cnt in new_contours:
+            cnt = np.squeeze(cnt)
+            for point in cnt:
+                point = (point[0], point[1])
+                mask_with_bottom = cv2.circle(mask, point, 1, 127, thickness=-1)
+        self.debugger.img(mask_with_bottom, 'Mask with Object Bottom Area (gray)')
+            
 
 
 
