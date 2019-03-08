@@ -89,7 +89,8 @@ class Debugger:
                 print('shape: {}   dtype: {}   min: {}   mean: {}   max: {}'.format(
                     mat.shape, mat.dtype, mat.min(), mat.mean(), mat.max()))
             else:
-                print('[Warning] Input type is not matrix(numpy.ndarray or torch.tensor)!')
+                print('[Warning] Input type is {}, not matrix(numpy.ndarray or torch.tensor)!'.format(
+                    type(mat)))
                 print(mat)
             print('-' * (len(comment) + 12))
 
