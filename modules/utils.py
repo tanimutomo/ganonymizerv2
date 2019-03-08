@@ -86,8 +86,11 @@ class Debugger:
                         mat.shape, mat.dtype, mat.min(), mat.to(torch.float32).mean(), mat.max(), mat.device))
 
             elif type(mat) is np.ndarray:
-                print('shape: {}   dtype: {}   min: {}   mean: {}   max: {}'.format(
-                    mat.shape, mat.dtype, mat.min(), mat.mean(), mat.max()))
+                if mat.shape[0] == 0:
+                    print(mat)
+                else:
+                    print('shape: {}   dtype: {}   min: {}   mean: {}   max: {}'.format(
+                        mat.shape, mat.dtype, mat.min(), mat.mean(), mat.max()))
             else:
                 print('[Warning] Input type is {}, not matrix(numpy.ndarray or torch.tensor)!'.format(
                     type(mat)))
