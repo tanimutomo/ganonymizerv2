@@ -27,7 +27,7 @@ class GANonymizer:
     
     def predict(self, img_path):
         # Loading input image
-        print('\n===== Loading Image =====')
+        print('\n', '===== Loading Image =====')
         fname, fext = img_path.split('/')[-1].split('.')
         img = Image.open(img_path)
         img = img.resize((int(img.width / 4), int(img.height / 4)))
@@ -38,7 +38,7 @@ class GANonymizer:
         self.debugger.img(img, 'Input Image')
 
         # semantic segmentation
-        print('\n===== Semantic Segmentation =====')
+        print('\n', '===== Semantic Segmentation =====')
 
         segmap_path = os.path.join(self.config['checkpoint'], fname + '_segmap' + 'pkl')
         if self.config['semseg_mode'] is 'exec':
@@ -57,7 +57,7 @@ class GANonymizer:
 
 
         # create mask image and image with mask
-        print('\n===== Creating Mask Image =====')
+        print('\n', '===== Creating Mask Image =====')
         mask_path = os.path.join(self.config['checkpoint'], fname + '_mask' + 'pkl')
         img_with_mask_path = os.path.join(self.config['checkpoint'], fname + '_img_with_mask' + 'pkl')
 
@@ -83,12 +83,12 @@ class GANonymizer:
 
 
         # shadow detection
-        print('\n===== Shadow Detection =====')
+        print('\n', '===== Shadow Detection =====')
         self.shadow_detecter.detect(img, mask, img_with_mask)
 
 
         # inpainter
-        print('\n===== Image Inpainting and Edge Inpainting =====')
+        print('\n', '===== Image Inpainting and Edge Inpainting =====')
         inpaint_path = os.path.join(self.config['checkpoint'], fname + '_inpaint' + 'pkl')
         inpaint_edge_path = os.path.join(self.config['checkpoint'], fname + '_inpaint_edge' + 'pkl')
 
