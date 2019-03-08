@@ -39,24 +39,45 @@ class ShadowDetecter:
 
 
     def detect(self, img, mask, img_with_mask):
+        H, W = mask.shape
         contours, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
         print(contours[2].shape)
+
+        # filtering by upside and downside of the contours
         new_contours = []
+        thresh = 3
         for cnt in contours:
             self.debugger.matrix(cnt, 'cnt')
-            cnt_ = np.squeeze(cnt) # cnt's shape is (num, 2(x, y))
-            self.debugger.matrix(cnt_, 'cnt')
-            cnt_[:, 1] -= 1 # y = y - 1
-            self.debugger.matrix(cnt_, 'cnt')
-            idx = (cnt_[:, 1], cnt_[:, 0]) # (ys, xs)
-            cnt_pixel = mask[(idx)]
-            self.debugger.matrix(cnt_pixel, 'cnt_pixel')
-            idx = np.where(cnt_pixel==255)
-            self.debugger.matrix(idx, 'idx')
-            self.debugger.matrix(cnt, 'before cnt')
-            cnt = cnt[idx]
-            self.debugger.matrix(cnt, 'after cnt')
-            new_contours.append(cnt)
+            cnt = np.squeeze(cnt) # cnt's shape is (num, 2(x, y))
+
+            # upside filtering
+            upside = np.stack([cnt[:, 0], cnt[:, 1] - thresh], axis=-1) # y = y - 1
+            upside = np.where(upside < 0, 0, upside)
+            self.debugger.matrix(upside, 'upside')
+
+            up_idx = (upside[:, 1], upside[:, 0]) # (ys, xs)
+            up_pixel = mask[(up_idx)]
+            self.debugger.matrix(up_pixel, 'up_pixel')
+
+            up_idx = np.where(up_pixel==255)
+            self.debugger.matrix(up_idx, 'up_idx')
+            up_filtered_cnt = cnt[up_idx]
+
+
+            # downside filtering
+            downside = np.stack([up_filtered_cnt[:, 0],
+                up_filtered_cnt[:, 1] + thresh], axis=-1) # y = y + 1
+            downside = np.where(downside >= H, H - 1, downside)
+            self.debugger.matrix(downside, 'downside')
+            down_idx = (downside[:, 1], downside[:, 0]) # (ys, xs)
+            down_pixel = mask[(down_idx)]
+            self.debugger.matrix(down_pixel, 'down_pixel')
+            down_idx = np.where(down_pixel!=255)
+            self.debugger.matrix(down_idx, 'down_idx')
+            up_down_filtered_cnt = cnt[down_idx]
+
+            self.debugger.matrix(up_down_filtered_cnt, 'after cnt')
+            new_contours.append(up_down_filtered_cnt)
             
         # self.debugger.matrix(new_contours, 'after contours')
         print(new_contours[2].shape)
