@@ -7,6 +7,7 @@ from skimage.segmentation import mark_boundaries
 class ShadowDetecter:
     def __init__(self, debugger):
         self.debugger = debugger
+        self.thresh = 1
 
     
     def mask(self, img, segmap, labels):
@@ -39,61 +40,76 @@ class ShadowDetecter:
 
 
     def detect(self, img, mask, img_with_mask):
-        H, W = mask.shape
-        contours, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-        print(contours[2].shape)
+        # connected components
+        label_map, stats, labels = self._detect_object(mask)
+
+        for label in labels:
+            obj_img = np.where(label_map==label, 255, 0).astype(np.uint8)
+            contours = self._extract_obj_bot(obj_img)
+            bot_img = np.zeros(obj_img.shape, dtype=np.uint8)
+            bot_img = self._draw_contours_as_point(bot_img, contours)
+            self.debugger.img(bot_img, 'bot_img')
+            
+        
+    def _extract_obj_bot(self, img):
+        H, W = img.shape
+        # find contours
+        contours, _ = cv2.findContours(img, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 
         # filtering by upside and downside of the contours
-        new_contours = []
-        thresh = 3
+        filtered_contours = []
         for cnt in contours:
             self.debugger.matrix(cnt, 'cnt')
             cnt = np.squeeze(cnt) # cnt's shape is (num, 2(x, y))
 
             # upside filtering
-            upside = np.stack([cnt[:, 0], cnt[:, 1] - thresh], axis=-1) # y = y - 1
-            upside = np.where(upside < 0, 0, upside)
-            self.debugger.matrix(upside, 'upside')
+            upside_y = cnt[:, 1] - self.thresh
+            upside_y = np.where(upside_y < 0, 0, upside_y)
+            upside = np.stack([cnt[:, 0], upside_y], axis=-1) # y = y - 1
 
             up_idx = (upside[:, 1], upside[:, 0]) # (ys, xs)
-            up_pixel = mask[(up_idx)]
-            self.debugger.matrix(up_pixel, 'up_pixel')
+            up_pixel = img[(up_idx)]
 
             up_idx = np.where(up_pixel==255)
-            self.debugger.matrix(up_idx, 'up_idx')
             up_filtered_cnt = cnt[up_idx]
 
 
             # downside filtering
-            downside = np.stack([up_filtered_cnt[:, 0],
-                up_filtered_cnt[:, 1] + thresh], axis=-1) # y = y + 1
-            downside = np.where(downside >= H, H - 1, downside)
-            self.debugger.matrix(downside, 'downside')
-            down_idx = (downside[:, 1], downside[:, 0]) # (ys, xs)
-            down_pixel = mask[(down_idx)]
-            self.debugger.matrix(down_pixel, 'down_pixel')
-            down_idx = np.where(down_pixel!=255)
-            self.debugger.matrix(down_idx, 'down_idx')
-            up_down_filtered_cnt = cnt[down_idx]
+            downside_y = up_filtered_cnt[:, 1] + self.thresh
+            downside_y = np.where(downside_y >= H, H - 1, downside_y)
+            downside = np.stack([up_filtered_cnt[:, 1], 
+                downside_y], axis=-1) # y = y + 1
 
-            self.debugger.matrix(up_down_filtered_cnt, 'after cnt')
-            new_contours.append(up_down_filtered_cnt)
+            down_idx = (downside[:, 1], downside[:, 0]) # (ys, xs)
+            down_pixel = img[(down_idx)]
+
+            down_idx = np.where(down_pixel==0)
+            up_down_filtered_cnt = up_filtered_cnt[down_idx]
+
+            # upside and downside filtering
+            up_down_filtered_cnt = np.expand_dims(up_down_filtered_cnt, axis=1)
+            filtered_contours.append(up_down_filtered_cnt)
+
+        return filtered_contours
             
-        # self.debugger.matrix(new_contours, 'after contours')
-        print(new_contours[2].shape)
         
+    def _draw_contours_as_point(self, img, contours):
         # width = int((mask.shape[0] + mask.shape[1]) / 25.6)
         width = 2
-        # mask_with_bottom = cv2.drawContours(mask, new_contours, -1, 127, width) 
-        mask_with_bottom = mask.copy()
-        for cnt in new_contours:
+        # img_with_bottom = cv2.drawContours(img, new_contours, -1, 127, width) 
+        for cnt in contours:
             cnt = np.squeeze(cnt)
             for point in cnt:
                 point = (point[0], point[1])
-                mask_with_bottom = cv2.circle(mask, point, 1, 127, thickness=-1)
-        self.debugger.img(mask_with_bottom, 'Mask with Object Bottom Area (gray)')
+                img_with_bottom = cv2.circle(img, point, 1, 127, thickness=-1)
+
+        return img_with_bottom
             
 
+    def _detect_object(self, img):
+        num, label_map, stats, _ = cv2.connectedComponentsWithStats(img)
+        label_list = [i+1 for i in range(num - 1)]
+        return label_map, stats, label_list
 
 
     def old_detect(self, img, mask, img_with_mask):
