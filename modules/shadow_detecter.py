@@ -5,16 +5,16 @@ from skimage.segmentation import felzenszwalb, slic
 from skimage.segmentation import mark_boundaries
 
 class ShadowDetecter:
-    def __init__(self, debugger):
+    def __init__(self, cofig, debugger):
         self.debugger = debugger
-        self.thresh = 1
+        self.thresh = 3
 
     
     def mask(self, img, segmap, labels):
         # collect dynamic object's id
         dynamic_object_ids = []
         for label in labels:
-            if label.category is 'vehicle' and label.trainId is not 19:
+            if (label.category is 'vehicle' or label.category is 'human') and label.trainId is not 19:
                 dynamic_object_ids.append(label.trainId)
 
         # create the mask image using only segmap
@@ -27,29 +27,131 @@ class ShadowDetecter:
         obj_mask = self._expand_mask(obj_mask)
 
         # visualization
-        self.debugger.matrix(obj_mask, 'Mask Image based on only segmap')
-        self.debugger.img(obj_mask, 'Mask Image based on only segmap', gray=True)
+        # self.debugger.matrix(obj_mask, 'Mask Image based on only segmap')
+        # self.debugger.img(obj_mask, 'Mask Image based on only segmap', gray=True)
 
         # image with mask
         obj_mask_3c = np.stack([obj_mask for _ in range(3)], axis=-1)
         img_with_mask = np.where(obj_mask_3c==255, obj_mask_3c, img).astype(np.uint8)
-        self.debugger.img(img_with_mask, 'Image with Mask')
-        self.debugger.matrix(img_with_mask, 'image with mask')
+        # self.debugger.img(img_with_mask, 'Image with Mask')
+        # self.debugger.matrix(img_with_mask, 'image with mask')
 
         return obj_mask.astype(np.uint8), img_with_mask.astype(np.uint8)
+
+
+    def separated_mask(self, img, segmap, crop_rate, labels):
+        mask, _ = self.mask(img, segmap, labels)
+        H, W = mask.shape
+        label_map, stats, labels = self._detect_object(mask)
+        self.debugger.matrix(label_map, 'label map')
+        self.debugger.img(label_map, 'label map')
+        inputs = []
+        
+        for label, stat in zip(labels, stats):
+            box = np.array([0, 0, 0, 0])
+            obj = np.where(label_map==label, 255, 0).astype(np.uint8)
+            self.debugger.matrix(obj, 'object image')
+            self.debugger.img(obj, 'object image', gray=True)
+            tl = np.array([stat[0], stat[1]])
+            w, h = stat[2], stat[3]
+            br = np.array([stat[0] + w, stat[1] + h])
+            center = np.floor(((br + tl) / 2)).astype(np.int32)
+            area = stat[4]
+
+            if w*3 > 256:
+                box[0], box[2] = self._crop_obj(tl[0], br[0],
+                        int(w / crop_rate), 0, W)
+
+            else:
+                box[0], box[2] = self._crop_obj(center[0], center[0], 128, 0, W)
+                    
+            if h*3 > 256:
+                box[1], box[3] = self._crop_obj(tl[1], br[1],
+                        int(h / crop_rate), 0, H)
+
+            else:
+                box[1], box[3] = self._crop_obj(center[1], center[1], 128, 0, H)
+
+            img_part = img[box[1]:box[3], box[0]:box[2], :]
+            mask_part = obj[box[1]:box[3], box[0]:box[2]]
+
+            self.debugger.matrix(img_part, 'before img part')
+            # self.debugger.img(img_part, 'before img part')
+            self.debugger.matrix(mask_part, 'before mask part')
+            # self.debugger.img(mask_part, 'before mask part')
+
+            img_part = self._adjust_imsize(img_part)
+            mask_part = self._adjust_imsize(mask_part)
+
+            self.debugger.matrix(img_part, 'after img part')
+            # self.debugger.img(img_part, 'after img part')
+            self.debugger.matrix(mask_part, 'after mask part')
+            # self.debugger.img(mask_part, 'after mask part')
+
+            assert (img_part.shape[0], img_part.shape[1]) == (mask_part.shape[0], mask_part.shape[1])
+            inputs.append({'img': img_part, 'mask': mask_part, 
+                'box': box, 'new_size': mask_part.shape, 'area': area})
+
+            self.debugger.matrix(img_part, 'img part')
+            self.debugger.matrix(mask_part, 'mask part')
+
+        return inputs
 
 
     def detect(self, img, mask, img_with_mask):
         # connected components
         label_map, stats, labels = self._detect_object(mask)
 
-        for label in labels:
+        for label, stat in zip(labels, stats):
             obj_img = np.where(label_map==label, 255, 0).astype(np.uint8)
             contours = self._extract_obj_bot(obj_img)
             bot_img = np.zeros(obj_img.shape, dtype=np.uint8)
-            bot_img = self._draw_contours_as_point(bot_img, contours)
-            self.debugger.img(bot_img, 'bot_img')
-            
+            bot_img = self._draw_contours_as_point(bot_img, contours, stat[4])
+            bot_img = self._obj_area_filter(bot_img, obj_img)
+ 
+
+    def _crop_obj(self, top, bot, base, min_thresh, max_thresh):
+        if top - base >= min_thresh:
+            ntop = top - base
+            extra = 0
+        else:
+            ntop = min_thresh
+            extra = min_thresh - (top - base)
+
+        if bot + base + extra < max_thresh:
+            nbot = bot + base + extra
+            extra = 0
+        else:
+            nbot = max_thresh
+            extra = bot + base + extra - max_thresh
+
+        ntop = ntop - extra if ntop - extra >= min_thresh else min_thresh
+
+        return ntop, nbot
+
+    
+    def _adjust_imsize(self, img):
+        size = np.array([img.shape[0], img.shape[1]])
+        nsize = np.array([0, 0])
+        argmax = np.argmax(size)
+        if size[argmax] > 300:
+            argmin = np.argmin(size)
+            rate = 300 / size[argmax]
+            nsize[argmax] = 300
+            nsize[argmin] = np.ceil(size[argmin] * rate).astype(np.int32)
+        else:
+            nsize = size.copy()
+
+        nsize[0] = nsize[0] if nsize[0] % 4 == 0 else nsize[0] - (nsize[0] % 4)
+        nsize[1] = nsize[1] if nsize[1] % 4 == 0 else nsize[1] - (nsize[1] % 4)
+        out = cv2.resize(img, (nsize[1], nsize[0]))
+
+        return out
+
+
+    def _obj_area_filter(self, bot, obj):
+        return np.where(obj==255, 0, bot)
+
         
     def _extract_obj_bot(self, img):
         H, W = img.shape
@@ -93,23 +195,29 @@ class ShadowDetecter:
         return filtered_contours
             
         
-    def _draw_contours_as_point(self, img, contours):
-        # width = int((mask.shape[0] + mask.shape[1]) / 25.6)
-        width = 2
+    def _draw_contours_as_point(self, img, contours, area):
+        # radius = int(np.sqrt(area) / 2)
+        radius = 1
         # img_with_bottom = cv2.drawContours(img, new_contours, -1, 127, width) 
         for cnt in contours:
             cnt = np.squeeze(cnt)
             for point in cnt:
                 point = (point[0], point[1])
-                img_with_bottom = cv2.circle(img, point, 1, 127, thickness=-1)
+                img_with_bottom = cv2.circle(img, point, radius, 127, thickness=-1)
 
         return img_with_bottom
+
+
+    def _draw_contours(self, img, contours, area):
+        width = int(np.sqrt(area))
+        return cv2.drawContours(img, contours, -1, 127, width) 
             
 
     def _detect_object(self, img):
         num, label_map, stats, _ = cv2.connectedComponentsWithStats(img)
+        # stat is [tl_x, tl_y, w, h, area]
         label_list = [i+1 for i in range(num - 1)]
-        return label_map, stats, label_list
+        return label_map, stats[1:], label_list
 
 
     def old_detect(self, img, mask, img_with_mask):

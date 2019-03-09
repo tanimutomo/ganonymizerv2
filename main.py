@@ -31,6 +31,9 @@ if __name__ == '__main__':
             'semseg': 'DeepLabV3',
             'resnet': 18,
 
+            # mask
+            'mask': 'separate',
+
             # inpaint
             'inpaint': 'EdgeConnect',
             'checkpoints_path': 'modules/edge_connect/checkpoints',
