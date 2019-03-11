@@ -26,14 +26,15 @@ def tensor_img_to_numpy(tensor):
 
 
 class Debugger:
-    def __init__(self, debug, save, output_dir=None):
+    def __init__(self, main, debug, output_dir=None):
+        self.main = main
         self.debug = debug
         self.save = save
         self.order = 0
         self.output_dir = output_dir
 
-    def img(self, img, comment, gray=False):
-        if self.debug:
+    def img(self, img, comment, gray=False, main=False):
+        if self.debug or (self.main and main):
             print(comment)
             if type(img) is torch.Tensor and len(list(img.shape)) == 3:
                 img = tensor_img_to_numpy(img)
@@ -54,15 +55,15 @@ class Debugger:
                     self.order += 1
 
 
-    def param(self, param, comment):
-        if self.debug:
+    def param(self, param, comment, main=False):
+        if self.debug or (self.main and main):
             print('-----', comment, '-----')
             print(param)
             print('-' * (len(comment) + 12))
 
 
-    def imsave(self, img, path):
-        if self.debug:
+    def imsave(self, img, path, main=False):
+        if self.debug or (self.main and main):
             print(img.shape)
             if type(img) is torch.Tensor:
                 img = img.cpu().numpy().astype(np.uint8)
@@ -74,8 +75,8 @@ class Debugger:
                 raise RuntimeError('The type of input image must be numpy.ndarray or torch.Tensor.')
 
 
-    def matrix(self, mat, comment):
-        if self.debug:
+    def matrix(self, mat, comment, main=False):
+        if self.debug or (self.main and main):
             print('-----', comment, '-----')
             if type(mat) is torch.Tensor:
                 if 'float' in str(mat.dtype):
