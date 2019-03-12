@@ -26,7 +26,7 @@ def tensor_img_to_numpy(tensor):
 
 
 class Debugger:
-    def __init__(self, main, debug, output_dir=None):
+    def __init__(self, main, debug, save=False, output_dir=None):
         self.main = main
         self.debug = debug
         self.save = save

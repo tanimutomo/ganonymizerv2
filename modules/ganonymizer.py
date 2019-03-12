@@ -33,8 +33,8 @@ class GANonymizer:
             self._shadow_detection(img, mask, img_with_mask)
             out, _ = self._inpaint(img, mask)
             out = Image.fromarray(out)
-            out.save('./data/exp/cityscapes_testset/{}_etr_out.{}'.format(
-                self.fname, self.fext))
+            out.save('./data/exp/cityscapes_testset/{}_etr_out_resized_{}.{}'.format(
+                self.fname, self.config['resize_factor'], self.fext))
         elif self.config['mask'] == 'separate':
             inputs = self._separated_mask(img, segmap)
             inpainteds = []
@@ -44,20 +44,13 @@ class GANonymizer:
                 else:
                     inpainted, inpainted_edge = self._inpaint(input['img'], input['mask'])
 
-                self.debugger.matrix(input['img'], 'input')
-                self.debugger.img(input['img'], 'input')
-                self.debugger.matrix(input['mask'], 'mask')
-                self.debugger.img(input['mask'], 'mask')
-                self.debugger.matrix(inpainted, 'output')
-                self.debugger.img(inpainted, 'output')
-
                 inpainteds.append(inpainted)
             
             out = self._integrate_outputs(img, inputs, inpainteds)
             self.debugger.img(out, 'Final Output')
             out = Image.fromarray(out)
-            out.save('./data/exp/cityscapes_testset/{}_sep_out.{}'.format(
-                self.fname, self.fext))
+            out.save('./data/exp/cityscapes_testset/{}_sep_out_resized_{}.{}'.format(
+                self.fname, self.config['resize_factor'], self.fext))
 
 
     def _load_img(self, img_path):
@@ -70,8 +63,8 @@ class GANonymizer:
         img = np.array(img)
 
         # visualization
-        self.debugger.matrix(img, 'Input Image')
-        self.debugger.img(img, 'Input Image')
+        self.debugger.matrix(img, 'Input Image', main=True)
+        self.debugger.img(img, 'Input Image', main=True)
 
         return img
 
@@ -92,8 +85,8 @@ class GANonymizer:
                 pickle.dump(semseg_map, f)
 
         # visualization
-        self.debugger.matrix(semseg_map, 'Semantic Segmentation Map Prediction by DeepLabV3')
-        self.debugger.img(semseg_map, 'Semantic Segmentation Map Prediction by DeepLabV3')
+        self.debugger.matrix(semseg_map, 'Semantic Segmentation Map Prediction by DeepLabV3', main=True)
+        self.debugger.img(semseg_map, 'Semantic Segmentation Map Prediction by DeepLabV3', main=True)
 
         return semseg_map
 
@@ -119,10 +112,10 @@ class GANonymizer:
                 pickle.dump(img_with_mask, f)
 
         # visualization
-        self.debugger.matrix(mask, 'mask')
-        self.debugger.img(mask, 'mask', gray=True)
-        self.debugger.matrix(img_with_mask, 'img_with_mask')
-        self.debugger.img(img_with_mask, 'img_with_mask')
+        self.debugger.matrix(mask, 'mask', main=True)
+        self.debugger.img(mask, 'mask', gray=True, main=True)
+        self.debugger.matrix(img_with_mask, 'img_with_mask', main=True)
+        self.debugger.img(img_with_mask, 'img_with_mask', main=True)
 
         return mask, img_with_mask
 
@@ -174,10 +167,10 @@ class GANonymizer:
                 pickle.dump(inpainted_edge, f)
 
         # visualization
-        self.debugger.matrix(inpainted_edge, 'Inpainted Edge')
-        self.debugger.img(inpainted_edge, 'Inpainted Edge', gray=True)
-        self.debugger.matrix(inpainted, 'Inpainted Image')
-        self.debugger.img(inpainted, 'Inpainted Image')
+        self.debugger.matrix(inpainted_edge, 'Inpainted Edge', main=True)
+        self.debugger.img(inpainted_edge, 'Inpainted Edge', gray=True, main=True)
+        self.debugger.matrix(inpainted, 'Inpainted Image', main=True)
+        self.debugger.img(inpainted, 'Inpainted Image', main=True)
 
         return inpainted, inpainted_edge
 
