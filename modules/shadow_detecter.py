@@ -1,8 +1,11 @@
 import cv2
 import numpy as np
 import torch
-from skimage.segmentation import felzenszwalb, slic
-from skimage.segmentation import mark_boundaries
+from skimage import color
+from skimage.segmentation import felzenszwalb, slic, quickshift, mark_boundaries
+from skimage.future import graph
+from sklearn.cluster import MeanShift
+from .utils import AverageMeter
 
 class ShadowDetecter:
     def __init__(self, cofig, debugger):
@@ -26,15 +29,9 @@ class ShadowDetecter:
         # expnad mask area by contours
         obj_mask = self._expand_mask(obj_mask)
 
-        # visualization
-        # self.debugger.matrix(obj_mask, 'Mask Image based on only segmap')
-        # self.debugger.img(obj_mask, 'Mask Image based on only segmap', gray=True)
-
         # image with mask
         obj_mask_3c = np.stack([obj_mask for _ in range(3)], axis=-1)
         img_with_mask = np.where(obj_mask_3c==255, obj_mask_3c, img).astype(np.uint8)
-        # self.debugger.img(img_with_mask, 'Image with Mask')
-        # self.debugger.matrix(img_with_mask, 'image with mask')
 
         return obj_mask.astype(np.uint8), img_with_mask.astype(np.uint8)
 
@@ -43,15 +40,11 @@ class ShadowDetecter:
         mask, _ = self.mask(img, segmap, labels)
         H, W = mask.shape
         label_map, stats, labels = self._detect_object(mask)
-        self.debugger.matrix(label_map, 'label map')
-        self.debugger.img(label_map, 'label map')
         inputs = []
         
         for label, stat in zip(labels, stats):
             box = np.array([0, 0, 0, 0])
             obj = np.where(label_map==label, 255, 0).astype(np.uint8)
-            self.debugger.matrix(obj, 'object image')
-            self.debugger.img(obj, 'object image', gray=True)
             tl = np.array([stat[0], stat[1]])
             w, h = stat[2], stat[3]
             br = np.array([stat[0] + w, stat[1] + h])
@@ -75,40 +68,133 @@ class ShadowDetecter:
             img_part = img[box[1]:box[3], box[0]:box[2], :]
             mask_part = obj[box[1]:box[3], box[0]:box[2]]
 
-            self.debugger.matrix(img_part, 'before img part')
-            # self.debugger.img(img_part, 'before img part')
-            self.debugger.matrix(mask_part, 'before mask part')
-            # self.debugger.img(mask_part, 'before mask part')
-
             img_part = self._adjust_imsize(img_part)
             mask_part = self._adjust_imsize(mask_part)
-
-            self.debugger.matrix(img_part, 'after img part')
-            # self.debugger.img(img_part, 'after img part')
-            self.debugger.matrix(mask_part, 'after mask part')
-            # self.debugger.img(mask_part, 'after mask part')
 
             assert (img_part.shape[0], img_part.shape[1]) == (mask_part.shape[0], mask_part.shape[1])
             inputs.append({'img': img_part, 'mask': mask_part, 
                 'box': box, 'new_size': mask_part.shape, 'area': area})
 
-            self.debugger.matrix(img_part, 'img part')
-            self.debugger.matrix(mask_part, 'mask part')
-
         return inputs
 
 
-    def detect(self, img, mask, img_with_mask):
+    def detect(self, img, mask):
         # connected components
         label_map, stats, labels = self._detect_object(mask)
 
         for label, stat in zip(labels, stats):
-            obj_img = np.where(label_map==label, 255, 0).astype(np.uint8)
-            contours = self._extract_obj_bot(obj_img)
-            bot_img = np.zeros(obj_img.shape, dtype=np.uint8)
-            bot_img = self._draw_contours_as_point(bot_img, contours, stat[4])
-            bot_img = self._obj_area_filter(bot_img, obj_img)
- 
+            # get each object in turn
+            obj_mask = np.where(label_map==label, 255, 0).astype(np.uint8)
+            self.debugger.matrix(obj_mask, 'object mask')
+            self.debugger.img(obj_mask, 'object mask')
+
+            # extract object's bottom area using contours
+            # contours = self._extract_obj_bot(obj_img)
+            # bot_img = np.zeros(obj_img.shape, dtype=np.uint8)
+            # bot_img = self._draw_contours_as_point(bot_img, contours, stat[4])
+            # bot_img = self._obj_area_filter(bot_img, obj_img)
+
+            # object area filtering
+            if stat[4] > img.shape[0] * img.shape[1] * 1e-3:
+                # calcurate the median of object size
+                hor_m, ver_m = self._ver_hor_median(obj_mask)
+
+                # get the bbox of object's bottom area
+                bbox = self._get_bottom_box(obj_mask, ver_m, hor_m, img.shape[1], img.shape[0])
+
+                # object location filtering
+                if bbox[3] > img.shape[0] * 0.2:
+                    # image with mask
+                    obj_mask_3c = np.stack([obj_mask for _ in range(3)], axis=-1)
+                    img_with_mask = np.where(obj_mask_3c==255, obj_mask_3c, img).astype(np.uint8)
+
+                    # visualization
+                    self.debugger.matrix(bbox, 'bbox')
+                    obj_with_bot_bbox = obj_mask.copy()
+                    obj_with_bot_bbox = cv2.rectangle(obj_with_bot_bbox, (bbox[0], bbox[1]),
+                            (bbox[2], bbox[3]), 255, 2)
+                    self.debugger.img(obj_with_bot_bbox,
+                            'Image of Object with Bottom Area based on object size medians')
+
+                    # extract bottom area image
+                    bot_img = self._box_img(img_with_mask, bbox)
+                    self.debugger.matrix(bot_img, 'bottom area image')
+                    self.debugger.img(bot_img, 'bottom area image')
+                    
+                    # # mean-shift segmentation
+                    # ms_segmented_img = self._meanshift(bot_img)
+                    # self.debugger.matrix(ms_segmented_img, 'segmented_img')
+                    # self.debugger.img(ms_segmented_img, 'segmented_img')
+
+                    # # SLIC Segmentation
+                    # segments = self._superpixel(bot_img, 'slic')
+                    # # with NGC
+                    # segments = self._superpixel(bot_img, 'slic', ngc=True)
+
+                    # # Felzenzwalb Segmentation
+                    # segments = self._superpixel(bot_img, 'felzenzwalb')
+                    # # with NGC
+                    # segments = self._superpixel(bot_img, 'felzenzwalb', ngc=True)
+
+                    # QuickShift Segmentation
+                    segments = self._superpixel(bot_img, 'quickshift')
+                    # with NGC
+                    # segments = self._superpixel(bot_img, 'quickshift', ngc=True)
+
+                    # extract segment which is bottom of object
+                    obj_bot_mask = self._box_img(obj_mask, bbox)
+                    self.debugger.img(obj_bot_mask, 'Object Mask Image')
+                    point = self._extract_obj_bot(obj_bot_mask)
+                    bot_point_img = np.zeros(obj_bot_mask.shape, dtype=np.uint8)
+                    bot_point_img = self._draw_contours_as_point(bot_point_img, point, stat[4])
+                    self.debugger.img(bot_point_img, 'Point of Object Bottom Area')
+
+                else:
+                    print('This object is too high')
+
+            else: 
+                print('This Object is too small')
+
+
+    def _box_img(self, img, box):
+        if len(list(img.shape)) == 3:
+            return img[box[1]:box[3], box[0]:box[2], :]
+        else:
+            return img[box[1]:box[3], box[0]:box[2]]
+
+
+    def _get_bottom_box(self, img, ver_m, hor_m, W, H):
+        box = self._get_bbox(img)
+        maxm = max(hor_m, ver_m)
+        box[0] = box[0] - maxm if box[0] - maxm >= 0 else 0
+        box[1] = box[1] + int((box[3] - box[1]) / 2)
+        box[2] = box[2] + maxm if box[2] + maxm < W else W - 1
+        box[3] = box[3] + maxm if box[3] + maxm < H else H - 1
+
+        return box
+
+
+    def _ver_hor_median(self, img):
+        medians = []
+        for img in [img, np.transpose(img, (1, 0))]:
+            y, x = np.where(img==255)
+            yset = list(set(y))
+            yset.sort()
+
+            lengths = []
+            for ys in yset:
+                yidx = np.where(y==ys)[0]
+                lengths.append(len(yidx))
+            length_median = np.median(np.array(lengths))
+            medians.append(np.floor(length_median))
+
+        return medians
+
+
+    def _get_bbox(self, img):
+        y, x = np.where(img==255)
+        return np.array([np.min(x), np.min(y), np.max(x), np.max(y)])
+
 
     def _crop_obj(self, top, bot, base, min_thresh, max_thresh):
         if top - base >= min_thresh:
@@ -161,7 +247,6 @@ class ShadowDetecter:
         # filtering by upside and downside of the contours
         filtered_contours = []
         for cnt in contours:
-            self.debugger.matrix(cnt, 'cnt')
             cnt = np.squeeze(cnt) # cnt's shape is (num, 2(x, y))
 
             # upside filtering
@@ -197,15 +282,16 @@ class ShadowDetecter:
         
     def _draw_contours_as_point(self, img, contours, area):
         # radius = int(np.sqrt(area) / 2)
+        out = img.copy()
         radius = 1
-        # img_with_bottom = cv2.drawContours(img, new_contours, -1, 127, width) 
         for cnt in contours:
             cnt = np.squeeze(cnt)
             for point in cnt:
                 point = (point[0], point[1])
-                img_with_bottom = cv2.circle(img, point, radius, 127, thickness=-1)
+                out[point[1], point[0]] = 255
+                # img_with_bottom = cv2.circle(img, point, radius, 127, thickness=-1)
 
-        return img_with_bottom
+        return out
 
 
     def _draw_contours(self, img, contours, area):
@@ -264,21 +350,43 @@ class ShadowDetecter:
                 self.debug.matrix(segment_mean_color, 'segment mean color')
 
 
-    def _slic(self, img):
-        num_segments = int(img.shape[0] * img.shape[1] / 500)
-        segments_slic = slic(img, n_segments=num_segments, compactness=10, sigma=1)
-        print('SLIC number of segments: {}'.format(len(np.unique(segments_slic))))
+    def _superpixel(self, img, method, ngc=False):
+        if method == 'slic':
+            num_segments = int(img.shape[0] * img.shape[1] / 100)
+            segments = slic(img, n_segments=num_segments, compactness=10, sigma=1)
+        elif method == 'felzenzwalb':
+            segments = felzenszwalb(img, scale=100, sigma=0.5, min_size=50)
+        elif method == 'quickshift':
+            segments = quickshift(img, kernel_size=3, max_dist=6, ratio=0.5)
 
-        segslic_img = mark_boundaries(img, segments_slic)
-        self.debug.img(segslic_img, 'SLIC Segmentation')
-        self.debug.matrix(segments_slic, 'segments_slic')
+        if ngc:
+            g = graph.rag_mean_color(img, segments, mode='similarity')
+            segments = graph.cut_normalized(segments, g, thresh=0.3)
+            segmented_img = mark_boundaries(img, segments)
+            self.debugger.matrix(segments, 'Segmentation by {} followed by NGC'.format(method))
+            self.debugger.img(segmented_img, 'Segmentation by {} followed by NGC'.format(method))
+        else:
+            segmented_img = mark_boundaries(img, segments)
+            self.debugger.matrix(segments, 'Segmentation by {}'.format(method))
+            self.debugger.img(segmented_img, 'Segmentation by {}'.format(method))
 
-        return segments_slic, num_segments
+
+        return segments
+
+
+    def _meanshift(self, img):
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+        input = img.reshape(-1, 1)
+        ms = MeanShift(n_jobs=-1)
+        ms.fit(input)
+        segmenteted_img = ms.labels_
+        segmented_img = segmented_img.reshape(img.shape[0], img.shape[1])
+        return segmented_img
 
 
     def _expand_mask(self, mask):
         mask = mask.astype(np.uint8)
-        width = int((mask.shape[0] + mask.shape[1]) / 256)
+        width = int((mask.shape[0] + mask.shape[1]) / 500)
         self.debugger.param(width, 'mask expand width')
         contours, hierarchy = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
         mask = cv2.drawContours(mask, contours, -1, 255, width) 
