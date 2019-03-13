@@ -1,10 +1,13 @@
 import cv2
 import numpy as np
 import torch
+import matplotlib.pyplot as plt
+from collections import Counter
 from skimage import color
 from skimage.segmentation import felzenszwalb, slic, quickshift, mark_boundaries
 from skimage.future import graph
 from sklearn.cluster import MeanShift
+
 from .utils import AverageMeter
 
 class ShadowDetecter:
@@ -27,7 +30,7 @@ class ShadowDetecter:
         obj_mask = np.where(obj_mask==255, 255, 0)
 
         # expnad mask area by contours
-        obj_mask = self._expand_mask(obj_mask)
+        # obj_mask = self._expand_mask(obj_mask)
 
         # image with mask
         obj_mask_3c = np.stack([obj_mask for _ in range(3)], axis=-1)
@@ -85,8 +88,6 @@ class ShadowDetecter:
         for label, stat in zip(labels, stats):
             # get each object in turn
             obj_mask = np.where(label_map==label, 255, 0).astype(np.uint8)
-            self.debugger.matrix(obj_mask, 'object mask')
-            self.debugger.img(obj_mask, 'object mask')
 
             # extract object's bottom area using contours
             # contours = self._extract_obj_bot(obj_img)
@@ -104,6 +105,10 @@ class ShadowDetecter:
 
                 # object location filtering
                 if bbox[3] > img.shape[0] * 0.2:
+                    # Visualize Objec Mask
+                    self.debugger.matrix(obj_mask, 'object mask')
+                    self.debugger.img(obj_mask, 'object mask')
+
                     # image with mask
                     obj_mask_3c = np.stack([obj_mask for _ in range(3)], axis=-1)
                     img_with_mask = np.where(obj_mask_3c==255, obj_mask_3c, img).astype(np.uint8)
@@ -149,11 +154,98 @@ class ShadowDetecter:
                     bot_point_img = self._draw_contours_as_point(bot_point_img, point, stat[4])
                     self.debugger.img(bot_point_img, 'Point of Object Bottom Area')
 
+                    # extract bottom area segment
+                    bot_segments, bot_segments_mcolor = self._extract_bot_segment(bot_img, segments, bot_point_img)
+
+                    # visualize color distribution
+                    label, gray = self._color_dist(np.array(list(bot_segments_mcolor.keys())),
+                            np.array(list(bot_segments_mcolor.values())))
+
+                    # clustering gray
+                    cluster = self._meanshift(gray.reshape(-1, 1))
+                    print(cluster)
+                    conter = Counter(list(cluster))
+                    print(conter)
+                    clst_mean = self._cluster_mean(cluster, gray)
+                    print(clst_mean)
+
+
                 else:
                     print('This object is too high')
 
             else: 
                 print('This Object is too small')
+
+
+    def _cluster_mean(self, cluster, value):
+        clst_mean = []
+        for clst in range(np.max(cluster)+1):
+            idx = np.where(cluster==clst)[0]
+            clst_mean.append(np.mean(value[idx]))
+
+        return clst_mean
+
+
+    def _visualize_seg_labels(self, img, segment):
+        vis = img.copy()
+        labels = np.unique(segment)
+        for label in labels:
+            ys, xs = np.where(segment==label)
+            my, mx = np.median(ys).astype(np.int32), np.median(xs).astype(np.int32)
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            vis = cv2.putText(vis, str(label), (mx - 10, my), font, 0.3, (0, 255, 255), 1, cv2.LINE_AA)
+        self.debugger.img(vis, 'Bottom Image with Segment Label')
+
+
+    def _color_dist(self, label, color):
+        gray = np.mean(color, axis=1)
+        self.debugger.matrix(gray, 'Mean of Segment Median Color')
+        order = np.argsort(gray)
+        gray, label = gray[order], label[order]
+        plt.figure(figsize=(10, 10), dpi=200)
+        plt.bar(np.arange(gray.shape[0]), gray,
+                tick_label=label, align='center')
+
+        return label, gray
+
+
+    def _extract_bot_segment(self, img, segments, point_img):
+        # the label of object bottom area
+        ys, xs = np.where(point_img==255)
+        bots = np.unique(segments[ys, :][:, xs])
+
+        tmp = np.max(segments) + 1
+        bot_segments = segments.copy()
+        
+        # extract bottom area segment from all segments image
+        # and create the dict of {label: median color}
+        label_mcolor = {}
+        for label in bots:
+            rgb_median = self._segment_mean_rgb(img, segments, label)
+            if np.sum(rgb_median) != 255.0*3.0:
+                bot_segments = np.where(bot_segments==label, tmp, bot_segments)
+                label_mcolor[label] = rgb_median
+        bot_segments = np.where(bot_segments==tmp, segments, tmp)
+        self.debugger.matrix(bot_segments, 'Bottom Segments')
+
+        # visualization
+        vis = mark_boundaries(img, bot_segments)
+        self.debugger.img(vis, 'Bottom Segment')
+        # visualize segment label in the image
+        self._visualize_seg_labels(vis, bot_segments)
+
+        return bot_segments, label_mcolor
+
+
+    def _segment_mean_rgb(self, img, segments, label):
+        ys, xs = np.where(segments==label)
+        if len(list(img.shape)) == 3:
+            segment_color = img[ys, :, :][:, xs, :]
+        else:
+            segment_color = img[ys, :][:, xs]
+        rgb_median = np.median(segment_color, axis=(0, 1))
+
+        return rgb_median
 
 
     def _box_img(self, img, box):
@@ -258,24 +350,24 @@ class ShadowDetecter:
             up_pixel = img[(up_idx)]
 
             up_idx = np.where(up_pixel==255)
-            up_filtered_cnt = cnt[up_idx]
+            filtered_cnt = cnt[up_idx]
 
 
-            # downside filtering
-            downside_y = up_filtered_cnt[:, 1] + self.thresh
-            downside_y = np.where(downside_y >= H, H - 1, downside_y)
-            downside = np.stack([up_filtered_cnt[:, 1], 
-                downside_y], axis=-1) # y = y + 1
+            # # downside filtering
+            # downside_y = up_filtered_cnt[:, 1] + self.thresh
+            # downside_y = np.where(downside_y >= H, H - 1, downside_y)
+            # downside = np.stack([up_filtered_cnt[:, 1], 
+            #     downside_y], axis=-1) # y = y + 1
 
-            down_idx = (downside[:, 1], downside[:, 0]) # (ys, xs)
-            down_pixel = img[(down_idx)]
+            # down_idx = (downside[:, 1], downside[:, 0]) # (ys, xs)
+            # down_pixel = img[(down_idx)]
 
-            down_idx = np.where(down_pixel==0)
-            up_down_filtered_cnt = up_filtered_cnt[down_idx]
+            # down_idx = np.where(down_pixel==0)
+            # filtered_cnt = filtered_cnt[down_idx]
 
             # upside and downside filtering
-            up_down_filtered_cnt = np.expand_dims(up_down_filtered_cnt, axis=1)
-            filtered_contours.append(up_down_filtered_cnt)
+            filtered_cnt = np.expand_dims(filtered_cnt, axis=1)
+            filtered_contours.append(filtered_cnt)
 
         return filtered_contours
             
@@ -374,14 +466,11 @@ class ShadowDetecter:
         return segments
 
 
-    def _meanshift(self, img):
-        img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-        input = img.reshape(-1, 1)
+    def _meanshift(self, data):
         ms = MeanShift(n_jobs=-1)
-        ms.fit(input)
-        segmenteted_img = ms.labels_
-        segmented_img = segmented_img.reshape(img.shape[0], img.shape[1])
-        return segmented_img
+        ms.fit(data)
+        out = ms.labels_
+        return out
 
 
     def _expand_mask(self, mask):
