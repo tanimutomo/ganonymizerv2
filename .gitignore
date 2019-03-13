@@ -118,3 +118,4 @@ modules/edge_connect/kronos-config.yml
 data/exp/
 *.png
 *.pth
+exp/
