@@ -143,7 +143,7 @@ class GANonymizer:
     def _shadow_detection(self, img, mask, img_with_mask):
         # shadow detection
         print('===== Shadow Detection =====')
-        self.shadow_detecter.detect(img, mask, img_with_mask)
+        self.shadow_detecter.detect(img, mask)
 
 
     def _inpaint(self, img, mask):
