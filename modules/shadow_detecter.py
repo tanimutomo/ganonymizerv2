@@ -164,10 +164,13 @@ class ShadowDetecter:
                     # clustering gray
                     cluster = self._meanshift(gray.reshape(-1, 1))
                     print(cluster)
-                    conter = Counter(list(cluster))
-                    print(conter)
+                    counter = Counter(list(cluster))
+                    print(counter)
                     clst_mean = self._cluster_mean(cluster, gray)
                     print(clst_mean)
+
+                    # get the lowest mean cluster as shadow cluster
+                    shadow_clst = self._get_shadow_cluster(cluster, clst_mean, counter)
 
 
                 else:
@@ -175,6 +178,25 @@ class ShadowDetecter:
 
             else: 
                 print('This Object is too small')
+
+
+    def _get_shadow_cluster(self, cluster, means, counter):
+        if len(cluster) < 10: return None
+        low_mean_clst = np.argmin(means)
+        print('low_mean_clst:', low_mean_clst)
+        if counter[low_mean_clst] < len(cluster) * 0.05: return None
+        count_except_sc = counter.copy()
+        del count_except_sc[low_mean_clst]
+        print('count_except_sc:', count_except_sc)
+        most_clst = max(count_except_sc, key=count_except_sc.get)
+        most_clst_mean = means[most_clst]
+        print('most_clst:', most_clst)
+        print('most_clst_mean:', most_clst_mean)
+        if counter[most_clst] < len(cluster) * 0.2: return None
+        if means[low_mean_clst] * 2 > most_clst_mean: return None
+        print('shadow_clst:', low_mean_clst)
+
+        return low_mean_clst
 
 
     def _cluster_mean(self, cluster, value):
