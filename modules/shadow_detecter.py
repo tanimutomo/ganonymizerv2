@@ -9,7 +9,7 @@ from sklearn.cluster import MeanShift
 
 
 class ShadowDetecter:
-    def __init__(self, cofig, debugger):
+    def __init__(self, config, debugger):
         self.config = config
         self.debugger = debugger
         self.thresh = 3
@@ -205,6 +205,7 @@ class ShadowDetecter:
 
         # create rag
         G = graph.rag_mean_color(img, segmap, mode='similarity')
+        graph.show_rag(segmap, G, img)
 
         # create labels list and segment median colors list (convert grayscale)
         labels = []
@@ -237,11 +238,11 @@ class ShadowDetecter:
         self.debugger.matrix(unused_labels, 'unused labels')
 
         # calcurate the allowing color range
-        alw_range = int((most_color - scolor) / 2)
+        alw_range = min(int((most_color - scolor) / 2), self.config['alw_range_max'])
         self.debugger.param(alw_range, 'Allowing Color Range')
 
         # find all shadow segments
-        for num in range(10):
+        for num in range(self.config['find_iteration']):
             add_ss_labels = []
             for slabel in ss_labels:
                 e_idx = np.where(s_edges==slabel)[0]

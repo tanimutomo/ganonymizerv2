@@ -45,6 +45,8 @@ if __name__ == '__main__':
             'obj_high_thresh': 0.2,
             'superpixel': 'quickshift',
             'shadow_high_thresh': 0.01,
+            'alw_range_max': 30,
+            'find_iteration': 3,
             'ss_score_thresh': 4,
             'sc_color_thresh': 1.5,
 
