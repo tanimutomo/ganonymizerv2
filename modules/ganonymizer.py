@@ -80,7 +80,7 @@ class GANonymizer:
         # semantic segmentation
         print('===== Semantic Segmentation =====')
 
-        segmap_path = os.path.join(self.config['checkpoint'], self.fname + '_segmap' + 'pkl')
+        segmap_path = os.path.join(self.config['checkpoint'], self.fname + '_segmap.' + 'pkl')
         if self.config['semseg_mode'] is 'exec':
             semseg_map = self.semseger.process(img)
         elif self.config['semseg_mode'] is 'pass':
@@ -106,7 +106,7 @@ class GANonymizer:
     def _entire_mask(self, img, semseg_map):
         # create mask image and image with mask
         print('===== Creating Mask Image =====')
-        omask_path = os.path.join(self.config['checkpoint'], self.fname + '_omask' + 'pkl')
+        omask_path = os.path.join(self.config['checkpoint'], self.fname + '_omask.' + 'pkl')
 
         if self.config['mask_mode'] is 'exec':
             omask = self.shadow_detecter.mask(img, semseg_map, self.labels)
@@ -128,7 +128,7 @@ class GANonymizer:
     def _separated_mask(self, img, semseg_map):
         # create mask image and image with mask
         print('===== Create separated inputs =====')
-        sep_inputs_path = os.path.join(self.config['checkpoint'], self.fname + '_sep_inputs' + 'pkl')
+        sep_inputs_path = os.path.join(self.config['checkpoint'], self.fname + '_sep_inputs.' + 'pkl')
 
         if self.config['mask_mode'] is 'exec':
             inputs = self.shadow_detecter.separated_mask(img, semseg_map, 
@@ -148,7 +148,7 @@ class GANonymizer:
     def _detect_shadow(self, img, mask):
         # shadow detection
         print('===== Shadow Detection =====')
-        smask_path = os.path.join(self.config['checkpoint'], self.fname + '_smask' + 'pkl')
+        smask_path = os.path.join(self.config['checkpoint'], self.fname + '_smask.' + 'pkl')
 
         if self.config['shadow_mode'] is 'exec':
             smask = self.shadow_detecter.detect(img, mask)
@@ -172,8 +172,8 @@ class GANonymizer:
     def _inpaint(self, img, mask):
         # inpainter
         print('===== Image Inpainting and Edge Inpainting =====')
-        inpaint_path = os.path.join(self.config['checkpoint'], self.fname + '_inpaint' + 'pkl')
-        inpaint_edge_path = os.path.join(self.config['checkpoint'], self.fname + '_inpaint_edge' + 'pkl')
+        inpaint_path = os.path.join(self.config['checkpoint'], self.fname + '_inpaint.' + 'pkl')
+        inpaint_edge_path = os.path.join(self.config['checkpoint'], self.fname + '_inpaint_edge.' + 'pkl')
 
         if self.config['inpaint_mode'] is 'exec':
             inpainted, inpainted_edge = self.inpainter.inpaint(img, mask)
