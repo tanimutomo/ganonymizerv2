@@ -29,12 +29,20 @@ class GANonymizer:
         img = self._load_img(img_path)
         segmap = self._semseg(img)
         if self.config['mask'] == 'entire':
-            mask, img_with_mask = self._entire_mask(img, segmap)
-            self._shadow_detection(img, mask, img_with_mask)
+            omask = self._entire_mask(img, segmap)
+            smask = self._detect_shadow(img, omask)
+            mask = self._combine_masks(omask, smask)
+            self.debugger.img(mask, 'Mask (Object Mask + Shadow Mask)', main=True, gray=True)
+
+            # image with mask
+            mask_3c = np.stack([mask for _ in range(3)], axis=-1)
+            img_with_mask = np.where(mask_3c==255, mask_3c, img).astype(np.uint8)
+            self.debugger.img(img_with_mask, 'Image with Mask', main=True)
+
             out, _ = self._inpaint(img, mask)
             out = Image.fromarray(out)
-            out.save('./data/exp/cityscapes_testset/{}_etr_out_resized_{}.{}'.format(
-                self.fname, self.config['resize_factor'], self.fext))
+            out.save('./data/exp/cityscapes_testset/{}_etr_out_shadow_{}.{}'.format(
+                self.fname, self.config['shadow_mode'], self.fext))
         elif self.config['mask'] == 'separate':
             inputs = self._separated_mask(img, segmap)
             inpainteds = []
@@ -43,7 +51,6 @@ class GANonymizer:
                     inpainted = cv2.inpaint(input['img'], input['mask'], 3, cv2.INPAINT_NS)
                 else:
                     inpainted, inpainted_edge = self._inpaint(input['img'], input['mask'])
-
                 inpainteds.append(inpainted)
             
             out = self._integrate_outputs(img, inputs, inpainteds)
@@ -90,34 +97,32 @@ class GANonymizer:
 
         return semseg_map
 
+    
+    def _combine_masks(self, mask, smask):
+        assert mask.shape == smask.shape
+        return np.where(mask + smask > 0, 255, 0)
+
 
     def _entire_mask(self, img, semseg_map):
         # create mask image and image with mask
         print('===== Creating Mask Image =====')
-        mask_path = os.path.join(self.config['checkpoint'], self.fname + '_mask' + 'pkl')
-        img_with_mask_path = os.path.join(self.config['checkpoint'], self.fname + '_img_with_mask' + 'pkl')
+        omask_path = os.path.join(self.config['checkpoint'], self.fname + '_omask' + 'pkl')
 
         if self.config['mask_mode'] is 'exec':
-            mask, img_with_mask = self.shadow_detecter.mask(img, semseg_map, self.labels)
+            omask = self.shadow_detecter.mask(img, semseg_map, self.labels)
         elif self.config['mask_mode'] is 'pass':
-            with open(mask_path, mode='rb') as f:
-                mask = pickle.load(f)
-            with open(img_with_mask_path, mode='rb') as f:
-                img_with_mask = pickle.load(f)
+            with open(omask_path, mode='rb') as f:
+                omask = pickle.load(f)
         elif self.config['mask_mode'] is 'save':
-            mask, img_with_mask = self.shadow_detecter.mask(img, semseg_map, self.labels)
-            with open(mask_path, mode='wb') as f:
-                pickle.dump(mask, f)
-            with open(img_with_mask_path, mode='wb') as f:
-                pickle.dump(img_with_mask, f)
+            omask = self.shadow_detecter.mask(img, semseg_map, self.labels)
+            with open(omask_path, mode='wb') as f:
+                pickle.dump(omask, f)
 
         # visualization
-        self.debugger.matrix(mask, 'mask', main=True)
-        self.debugger.img(mask, 'mask', gray=True, main=True)
-        self.debugger.matrix(img_with_mask, 'img_with_mask', main=True)
-        self.debugger.img(img_with_mask, 'img_with_mask', main=True)
+        self.debugger.matrix(omask, 'Object Mask', main=True)
+        self.debugger.img(omask, 'Object Mask', gray=True, main=True)
 
-        return mask, img_with_mask
+        return omask
 
 
     def _separated_mask(self, img, semseg_map):
@@ -140,10 +145,28 @@ class GANonymizer:
         return inputs
 
 
-    def _shadow_detection(self, img, mask, img_with_mask):
+    def _detect_shadow(self, img, mask):
         # shadow detection
         print('===== Shadow Detection =====')
-        self.shadow_detecter.detect(img, mask)
+        smask_path = os.path.join(self.config['checkpoint'], self.fname + '_smask' + 'pkl')
+
+        if self.config['shadow_mode'] is 'exec':
+            smask = self.shadow_detecter.detect(img, mask)
+        elif self.config['shadow_mode'] is 'pass':
+            with open(smask_path, mode='rb') as f:
+                smask = pickle.load(f)
+        elif self.config['shadow_mode'] is 'save':
+            smask = self.shadow_detecter.detect(img, mask)
+            with open(smask_path, mode='wb') as f:
+                pickle.dump(smask, f)
+        elif self.config['shadow_mode'] is 'none':
+            smask = np.zerso(mask.shape, dtype=np.uint8)
+
+        # visualization
+        self.debugger.matrix(smask, 'Shadow Mask', main=True)
+        self.debugger.img(smask, 'Shadow Mask', gray=True, main=True)
+
+        return smask
 
 
     def _inpaint(self, img, mask):
