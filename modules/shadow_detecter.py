@@ -132,19 +132,19 @@ class ShadowDetecter:
                     # self.debugger.img(ms_segmented_img, 'segmented_img')
 
                     # # SLIC Segmentation
-                    # segments = self._superpixel(bot_img, 'slic')
+                    # segmap = self._superpixel(bot_img, 'slic')
                     # # with NGC
-                    # segments = self._superpixel(bot_img, 'slic', ngc=True)
+                    # segmap = self._superpixel(bot_img, 'slic', ngc=True)
 
                     # # Felzenzwalb Segmentation
-                    # segments = self._superpixel(bot_img, 'felzenzwalb')
+                    # segmap = self._superpixel(bot_img, 'felzenzwalb')
                     # # with NGC
-                    # segments = self._superpixel(bot_img, 'felzenzwalb', ngc=True)
+                    # segmap = self._superpixel(bot_img, 'felzenzwalb', ngc=True)
 
                     # QuickShift Segmentation
-                    segments = self._superpixel(bot_img, 'quickshift')
+                    segmap = self._superpixel(bot_img, 'quickshift')
                     # with NGC
-                    # segments = self._superpixel(bot_img, 'quickshift', ngc=True)
+                    # segmap = self._superpixel(bot_img, 'quickshift', ngc=True)
 
                     # extract segment which is bottom of object
                     obj_bot_mask = self._box_img(obj_mask, bbox)
@@ -155,7 +155,7 @@ class ShadowDetecter:
                     self.debugger.img(bot_point_img, 'Point of Object Bottom Area')
 
                     # extract bottom area segment
-                    bot_segments, bot_segments_mcolor = self._extract_bot_segment(bot_img, segments, bot_point_img)
+                    bot_segmap, bot_segments_mcolor = self._extract_bot_segment(bot_img, segmap, bot_point_img)
 
                     # visualize color distribution
                     label, gray = self._color_dist(np.array(list(bot_segments_mcolor.keys())),
@@ -172,8 +172,13 @@ class ShadowDetecter:
                     # get the lowest mean cluster as shadow cluster
                     shadow_clst = self._get_shadow_cluster(cluster, clst_mean, counter)
 
-                    # visualize shadow cluster segment
-                    self._vis_shadow_cluster(bot_img, bot_segments, cluster, label, shadow_clst)
+                    if shadow_clst is not None:
+                        # visualize shadow cluster segment
+                        sc_segmap = self._get_sc_segmap(bot_img, bot_segmap, cluster, label, shadow_clst)
+                        self.debugger.matrix(sc_segmap, 'Check sc_segmap')
+
+                        # object bottom area fitering by segment's centroid
+                        sc_segmap = self._obj_bot_filter(bot_img, sc_segmap)
 
 
                 else:
@@ -183,24 +188,90 @@ class ShadowDetecter:
                 print('This Object is too small')
 
 
-    def _vis_shadow_cluster(self, img, segments, cluster, labels, sc):
+    def _obj_bot_filter(self, img, segmap):
+        # create rag
+        G = graph.rag_mean_color(img, segmap, mode='similarity')
+
+        # visualize for calcurating centroid
+        plt.figure(figsize=(10, 10), dpi=200)
+        lc = graph.show_rag(segmap, G, img)
+        cbar = plt.colorbar(lc)
+        plt.show()
+
+        outside = np.max(segmap)
+        ss_labels = []
+        for node in G.nodes:
+            label = G.nodes[node]['labels'][0]
+            if label != outside:
+                centroid = np.array(G.nodes[node]['centroid'])
+                print(label, centroid)
+
+                # calcurate boundingbox of segmap
+                H, W = img.shape[0], img.shape[1] 
+                ys, xs = np.where(segmap == label)
+                box = [np.min(xs), np.min(ys), np.max(xs), np.max(ys)]
+                width, height = box[2] - box[0], box[3] - box[1]
+
+
+                if centroid[0] > H * 0.1:
+                    # create check pixels for checking whether a segment is under the object
+                    hs = [int(centroid[0] * (2 / 3)), int(centroid[0] * (1 / 3)), 0]
+                    ws = [
+                            centroid[1],
+                            centroid[1] - int(width / 2) if centroid[1] - int(width / 2) > 0 else 0,
+                            centroid[1] + int(width / 2) if centroid[1] + int(width / 2) < W else W - 1
+                            ]
+                    checkpxs = []
+                    for h in hs:
+                        for w in ws:
+                            checkpxs.append([h, w])
+                    checkpxs = np.array(checkpxs)
+                    self.debugger.matrix(checkpxs, 'check pixels')
+
+                    # visualize check pixel place
+                    vis = img.copy()
+                    for cpx in checkpxs:
+                        vis[cpx[0], cpx[1], :] = (0, 255, 255)
+                    self.debugger.img(vis, 'check pixel visualization')
+
+                    # calcurate the shadow segment score (ss_score)
+                    ss_score = 0
+                    for cpx in checkpxs:
+                        rgb = np.sum(img[cpx[0], cpx[1], :])
+                        print(rgb)
+                        if rgb == 255 * 3:
+                            ss_score += 1
+
+                    print(ss_score)
+                    if ss_score > 4:
+                        ss_labels.append(label)
+
+        ss_segmap = self._filtered_segmap(img, segmap, ss_labels)
+
+        return ss_segmap
+
+
+    def _get_sc_segmap(self, img, segmap, cluster, labels, sc):
         # get shadow cluster segment's label
         idx = np.where(np.array(cluster) == sc)[0]
         sc_labels = labels[idx]
-        outside = np.max(segments)
+        sc_segmap = self._filtered_segmap(img, segmap, sc_labels)
+
+        return sc_segmap
+
+
+    def _filtered_segmap(self, img, segmap, labels):
+        outside = np.max(segmap)
         tmp = outside + 1
+        new_segmap = segmap.copy()
+        for label in labels:
+            new_segmap = np.where(new_segmap == label, tmp, new_segmap)
+        new_segmap = np.where(new_segmap == tmp, segmap, outside)
 
-        sc_segments = segments.copy()
-        for label in sc_labels:
-            sc_segments = np.where(sc_segments == label, tmp, sc_segments)
-        sc_segments = np.where(sc_segments == tmp, segments, outside)
+        vis = mark_boundaries(img, new_segmap)
+        self.debugger.img(vis, 'Filtered Segment Map')
 
-        vis = mark_boundaries(img, sc_segments)
-        self.debugger.img(vis, 'Shadow Cluster Segments')
-
-        # g = graph.rag_mean_color(img, segments, mode='similarity')
-        # for node in g.node:
-        #     if g2.node[node]['labels'][0] in sc_labels:
+        return new_segmap
 
 
     def _get_shadow_cluster(self, cluster, means, counter):
@@ -250,40 +321,41 @@ class ShadowDetecter:
         plt.figure(figsize=(10, 10), dpi=200)
         plt.bar(np.arange(gray.shape[0]), gray,
                 tick_label=label, align='center')
+        plt.show()
 
         return label, gray
 
 
-    def _extract_bot_segment(self, img, segments, point_img):
+    def _extract_bot_segment(self, img, segmap, point_img):
         # the label of object bottom area
         ys, xs = np.where(point_img==255)
-        bots = np.unique(segments[ys, :][:, xs])
+        bots = np.unique(segmap[ys, :][:, xs])
 
-        tmp = np.max(segments) + 1
-        bot_segments = segments.copy()
+        tmp = np.max(segmap) + 1
+        bot_segmap = segmap.copy()
         
-        # extract bottom area segment from all segments image
+        # extract bottom area segment from all segmap image
         # and create the dict of {label: median color}
         label_mcolor = {}
         for label in bots:
-            rgb_median = self._segment_mean_rgb(img, segments, label)
+            rgb_median = self._segment_mean_rgb(img, segmap, label)
             if np.sum(rgb_median) != 255.0 * 3.0:
-                bot_segments = np.where(bot_segments==label, tmp, bot_segments)
+                bot_segmap = np.where(bot_segmap==label, tmp, bot_segmap)
                 label_mcolor[label] = rgb_median
-        bot_segments = np.where(bot_segments==tmp, segments, tmp)
-        self.debugger.matrix(bot_segments, 'Bottom Segments')
+        bot_segmap = np.where(bot_segmap==tmp, segmap, tmp)
+        self.debugger.matrix(bot_segmap, 'Bottom segmap')
 
         # visualization
-        vis = mark_boundaries(img, bot_segments)
+        vis = mark_boundaries(img, bot_segmap)
         self.debugger.img(vis, 'Bottom Segment')
         # visualize segment label in the image
-        self._visualize_seg_labels(vis, bot_segments)
+        self._visualize_seg_labels(vis, bot_segmap)
 
-        return bot_segments, label_mcolor
+        return bot_segmap, label_mcolor
 
 
-    def _segment_mean_rgb(self, img, segments, label):
-        ys, xs = np.where(segments==label)
+    def _segment_mean_rgb(self, img, segmap, label):
+        ys, xs = np.where(segmap==label)
         if len(list(img.shape)) == 3:
             segment_color = img[ys, :, :][:, xs, :]
         else:
@@ -490,25 +562,25 @@ class ShadowDetecter:
     def _superpixel(self, img, method, ngc=False):
         if method == 'slic':
             num_segments = int(img.shape[0] * img.shape[1] / 100)
-            segments = slic(img, n_segments=num_segments, compactness=10, sigma=1)
+            segmap = slic(img, n_segments=num_segments, compactness=10, sigma=1)
         elif method == 'felzenzwalb':
-            segments = felzenszwalb(img, scale=100, sigma=0.5, min_size=50)
+            segmap = felzenszwalb(img, scale=100, sigma=0.5, min_size=50)
         elif method == 'quickshift':
-            segments = quickshift(img, kernel_size=3, max_dist=6, ratio=0.5)
+            segmap = quickshift(img, kernel_size=3, max_dist=6, ratio=0.5)
 
         if ngc:
-            g = graph.rag_mean_color(img, segments, mode='similarity')
-            segments = graph.cut_normalized(segments, g, thresh=0.3)
-            segmented_img = mark_boundaries(img, segments)
-            self.debugger.matrix(segments, 'Segmentation by {} followed by NGC'.format(method))
+            g = graph.rag_mean_color(img, segmap, mode='similarity')
+            segmap = graph.cut_normalized(segmap, g, thresh=0.3)
+            segmented_img = mark_boundaries(img, segmap)
+            self.debugger.matrix(segmap, 'Segmentation by {} followed by NGC'.format(method))
             self.debugger.img(segmented_img, 'Segmentation by {} followed by NGC'.format(method))
         else:
-            segmented_img = mark_boundaries(img, segments)
-            self.debugger.matrix(segments, 'Segmentation by {}'.format(method))
+            segmented_img = mark_boundaries(img, segmap)
+            self.debugger.matrix(segmap, 'Segmentation by {}'.format(method))
             self.debugger.img(segmented_img, 'Segmentation by {}'.format(method))
 
 
-        return segments
+        return segmap
 
 
     def _meanshift(self, data):
