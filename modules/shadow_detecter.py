@@ -170,7 +170,7 @@ class ShadowDetecter:
                     print(clst_mean)
 
                     # get the lowest mean cluster as shadow cluster
-                    shadow_clst = self._get_shadow_cluster(cluster, clst_mean, counter)
+                    shadow_clst, most_color = self._get_shadow_cluster(cluster, clst_mean, counter)
 
                     if shadow_clst is not None:
                         # visualize shadow cluster segment
@@ -178,7 +178,10 @@ class ShadowDetecter:
                         self.debugger.matrix(sc_segmap, 'Check sc_segmap')
 
                         # object bottom area fitering by segment's centroid
-                        sc_segmap = self._obj_bot_filter(bot_img, sc_segmap)
+                        ss_segmap, ss_labels = self._obj_bot_filter(bot_img, sc_segmap)
+
+                        # find other shadow segment using mean color and RAG
+                        ss_segmap, ss_labels = self._add_all_ss(bot_img, segmap, ss_labels, most_color)
 
 
                 else:
@@ -186,6 +189,74 @@ class ShadowDetecter:
 
             else: 
                 print('This Object is too small')
+
+
+    def _add_all_ss(self, img, segmap, ss_labels, most_color):
+        vis = mark_boundaries(img, segmap)
+        self.debugger.matrix(ss_labels, 'Shadow Segment Labels')
+        self._visualize_seg_labels(img, segmap)
+
+        # create rag
+        G = graph.rag_mean_color(img, segmap, mode='similarity')
+
+        # create labels list and segment median colors list (convert grayscale)
+        labels = []
+        mcolors = []
+        for node in G.nodes:
+            label = G.nodes[node]['labels'][0]
+            labels.append(label)
+            mcolors.append(np.mean(self._segment_median_rgb(img, segmap, label)))
+        labels = np.array(labels)
+        mcolors = np.array(mcolors)
+        self.debugger.matrix(labels, 'labels')
+        self.debugger.matrix(mcolors, 'mean colors')
+
+        # create start and end edges list
+        edges = np.array(G.edges)
+        s_edges = np.concatenate([edges[:, 0], edges[:, 1]])
+        e_edges = np.concatenate([edges[:, 1], edges[:, 0]])
+        self.debugger.matrix(s_edges, 'start edges')
+        self.debugger.matrix(e_edges, 'end edges')
+        
+        # calcurate the mean color of shadow segment
+        scolors = []
+        # unused labels list for searching the segments except for ss
+        unused_labels = labels.copy()
+        for label in ss_labels:
+            scolors.append(mcolors[np.where(labels == label)[0]])
+            unused_labels = np.delete(unused_labels, np.where(unused_labels == label)[0])
+        scolor = np.mean(scolors)
+        self.debugger.matrix(scolor, 'mean shadow color')
+        self.debugger.matrix(unused_labels, 'unused labels')
+
+        # calcurate the allowing color range
+        alw_range = int((most_color - scolor) / 2)
+        self.debugger.param(alw_range, 'Allowing Color Range')
+
+        # find all shadow segments
+        for num in range(10):
+            add_ss_labels = []
+            for slabel in ss_labels:
+                e_idx = np.where(s_edges==slabel)[0]
+                as_label = e_edges[e_idx]
+                for label in as_label:
+                    if label in unused_labels:
+                        color = mcolors[np.where(labels == label)[0]]
+                        if color > scolor - alw_range and color < scolor + alw_range:
+                            print('add', label)
+                            unused_labels = np.delete(unused_labels, np.where(unused_labels == label)[0])
+                            add_ss_labels.append(label)
+
+            ss_labels.extend(add_ss_labels)
+            if num != 0:
+                if np.all(unused_labels == pre_unused_labels):
+                    break
+            pre_unused_labels = unused_labels.copy()
+
+        self.debugger.matrix(ss_labels, 'Updated SS labels')
+        ss_segmap = self._filtered_segmap(img, segmap, ss_labels)
+
+        return ss_segmap, ss_labels
 
 
     def _obj_bot_filter(self, img, segmap):
@@ -204,7 +275,6 @@ class ShadowDetecter:
             label = G.nodes[node]['labels'][0]
             if label != outside:
                 centroid = np.array(G.nodes[node]['centroid'])
-                print(label, centroid)
 
                 # calcurate boundingbox of segmap
                 H, W = img.shape[0], img.shape[1] 
@@ -226,29 +296,28 @@ class ShadowDetecter:
                         for w in ws:
                             checkpxs.append([h, w])
                     checkpxs = np.array(checkpxs)
-                    self.debugger.matrix(checkpxs, 'check pixels')
 
-                    # visualize check pixel place
-                    vis = img.copy()
-                    for cpx in checkpxs:
-                        vis[cpx[0], cpx[1], :] = (0, 255, 255)
-                    self.debugger.img(vis, 'check pixel visualization')
+                    # # visualize check pixel place
+                    # vis = img.copy()
+                    # for cpx in checkpxs:
+                    #     vis[cpx[0], cpx[1], :] = (0, 255, 255)
+                    # self.debugger.img(vis, 'check pixel visualization')
 
                     # calcurate the shadow segment score (ss_score)
                     ss_score = 0
                     for cpx in checkpxs:
                         rgb = np.sum(img[cpx[0], cpx[1], :])
-                        print(rgb)
                         if rgb == 255 * 3:
                             ss_score += 1
 
-                    print(ss_score)
+                    self.debugger.matrix(ss_score, 'Shadow Segment Score')
                     if ss_score > 4:
                         ss_labels.append(label)
 
+        self.debugger.matrix(ss_labels, 'Shadow Segment Labels')
         ss_segmap = self._filtered_segmap(img, segmap, ss_labels)
 
-        return ss_segmap
+        return ss_segmap, ss_labels
 
 
     def _get_sc_segmap(self, img, segmap, cluster, labels, sc):
@@ -275,10 +344,10 @@ class ShadowDetecter:
 
 
     def _get_shadow_cluster(self, cluster, means, counter):
-        if len(cluster) < 10: return None
+        if len(cluster) < 10: return None, None
         low_mean_clst = np.argmin(means)
         print('low_mean_clst:', low_mean_clst)
-        if counter[low_mean_clst] < len(cluster) * 0.05: return None
+        if counter[low_mean_clst] < len(cluster) * 0.05: return None, None
         count_except_sc = counter.copy()
         del count_except_sc[low_mean_clst]
         print('count_except_sc:', count_except_sc)
@@ -286,11 +355,11 @@ class ShadowDetecter:
         most_clst_mean = means[most_clst]
         print('most_clst:', most_clst)
         print('most_clst_mean:', most_clst_mean)
-        if counter[most_clst] < len(cluster) * 0.2: return None
-        if means[low_mean_clst] * 2 > most_clst_mean: return None
+        if counter[most_clst] < len(cluster) * 0.2: return None, None
+        if means[low_mean_clst] * 2 > most_clst_mean: return None, None
         print('shadow_clst:', low_mean_clst)
 
-        return low_mean_clst
+        return low_mean_clst, most_clst_mean
 
 
     def _cluster_mean(self, cluster, value):
@@ -302,15 +371,15 @@ class ShadowDetecter:
         return clst_mean
 
 
-    def _visualize_seg_labels(self, img, segment):
-        vis = img.copy()
-        labels = np.unique(segment)
+    def _visualize_seg_labels(self, img, segmap):
+        vis = mark_boundaries(img, segmap)
+        labels = np.unique(segmap)
         for label in labels:
-            ys, xs = np.where(segment==label)
+            ys, xs = np.where(segmap==label)
             my, mx = np.median(ys).astype(np.int32), np.median(xs).astype(np.int32)
             font = cv2.FONT_HERSHEY_SIMPLEX
             vis = cv2.putText(vis, str(label), (mx - 10, my), font, 0.3, (0, 255, 255), 1, cv2.LINE_AA)
-        self.debugger.img(vis, 'Bottom Image with Segment Label')
+        self.debugger.img(vis, 'Bottom Image with Segmap Label')
 
 
     def _color_dist(self, label, color):
@@ -338,31 +407,28 @@ class ShadowDetecter:
         # and create the dict of {label: median color}
         label_mcolor = {}
         for label in bots:
-            rgb_median = self._segment_mean_rgb(img, segmap, label)
+            rgb_median = self._segment_median_rgb(img, segmap, label)
             if np.sum(rgb_median) != 255.0 * 3.0:
                 bot_segmap = np.where(bot_segmap==label, tmp, bot_segmap)
                 label_mcolor[label] = rgb_median
         bot_segmap = np.where(bot_segmap==tmp, segmap, tmp)
         self.debugger.matrix(bot_segmap, 'Bottom segmap')
 
-        # visualization
-        vis = mark_boundaries(img, bot_segmap)
-        self.debugger.img(vis, 'Bottom Segment')
         # visualize segment label in the image
-        self._visualize_seg_labels(vis, bot_segmap)
+        self._visualize_seg_labels(img, bot_segmap)
 
         return bot_segmap, label_mcolor
 
 
-    def _segment_mean_rgb(self, img, segmap, label):
+    def _segment_median_rgb(self, img, segmap, label):
         ys, xs = np.where(segmap==label)
         if len(list(img.shape)) == 3:
             segment_color = img[ys, :, :][:, xs, :]
         else:
             segment_color = img[ys, :][:, xs]
-        rgb_median = np.median(segment_color, axis=(0, 1))
+        color_median = np.median(segment_color, axis=(0, 1))
 
-        return rgb_median
+        return color_median
 
 
     def _box_img(self, img, box):
