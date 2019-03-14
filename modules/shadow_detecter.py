@@ -172,12 +172,35 @@ class ShadowDetecter:
                     # get the lowest mean cluster as shadow cluster
                     shadow_clst = self._get_shadow_cluster(cluster, clst_mean, counter)
 
+                    # visualize shadow cluster segment
+                    self._vis_shadow_cluster(bot_img, bot_segments, cluster, label, shadow_clst)
+
 
                 else:
                     print('This object is too high')
 
             else: 
                 print('This Object is too small')
+
+
+    def _vis_shadow_cluster(self, img, segments, cluster, labels, sc):
+        # get shadow cluster segment's label
+        idx = np.where(np.array(cluster) == sc)[0]
+        sc_labels = labels[idx]
+        outside = np.max(segments)
+        tmp = outside + 1
+
+        sc_segments = segments.copy()
+        for label in sc_labels:
+            sc_segments = np.where(sc_segments == label, tmp, sc_segments)
+        sc_segments = np.where(sc_segments == tmp, segments, outside)
+
+        vis = mark_boundaries(img, sc_segments)
+        self.debugger.img(vis, 'Shadow Cluster Segments')
+
+        # g = graph.rag_mean_color(img, segments, mode='similarity')
+        # for node in g.node:
+        #     if g2.node[node]['labels'][0] in sc_labels:
 
 
     def _get_shadow_cluster(self, cluster, means, counter):
@@ -244,7 +267,7 @@ class ShadowDetecter:
         label_mcolor = {}
         for label in bots:
             rgb_median = self._segment_mean_rgb(img, segments, label)
-            if np.sum(rgb_median) != 255.0*3.0:
+            if np.sum(rgb_median) != 255.0 * 3.0:
                 bot_segments = np.where(bot_segments==label, tmp, bot_segments)
                 label_mcolor[label] = rgb_median
         bot_segments = np.where(bot_segments==tmp, segments, tmp)
