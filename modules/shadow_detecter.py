@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-import torch
 import matplotlib.pyplot as plt
 from collections import Counter
 from skimage import color
@@ -8,10 +7,10 @@ from skimage.segmentation import felzenszwalb, slic, quickshift, mark_boundaries
 from skimage.future import graph
 from sklearn.cluster import MeanShift
 
-from .utils import AverageMeter
 
 class ShadowDetecter:
     def __init__(self, cofig, debugger):
+        self.config = config
         self.debugger = debugger
         self.thresh = 3
 
@@ -87,7 +86,7 @@ class ShadowDetecter:
             obj_mask = np.where(label_map==label, 255, 0).astype(np.uint8)
 
             # object area filtering
-            if stat[4] < img.shape[0] * img.shape[1] * 1e-3:
+            if stat[4] < img.shape[0] * img.shape[1] * self.config['obj_sml_thresh']:
                 continue
 
             # calcurate the median of object size
@@ -97,7 +96,7 @@ class ShadowDetecter:
             bbox = self._get_bottom_box(obj_mask, ver_m, hor_m, img.shape[1], img.shape[0])
 
             # object location filtering
-            if bbox[3] < img.shape[0] * 0.2:
+            if bbox[3] < img.shape[0] * self.config['obj_high_thresh']:
                 continue
 
             # Visualize Objec Mask
@@ -122,7 +121,7 @@ class ShadowDetecter:
             self.debugger.img(bot_img, 'bottom area image')
             
             # QuickShift Segmentation
-            segmap = self._superpixel(bot_img, 'quickshift')
+            segmap = self._superpixel(bot_img, self.config['superpixel'])
 
             # extract segment which is bottom of object
             obj_bot_mask = self._box_img(obj_mask, bbox)
@@ -288,7 +287,7 @@ class ShadowDetecter:
                 width, height = box[2] - box[0], box[3] - box[1]
 
 
-                if centroid[0] > H * 0.01:
+                if centroid[0] > H * self.config['shadow_high_thresh']:
                     # create check pixels for checking whether a segment is under the object
                     hs = [int(centroid[0] * (2 / 3)), int(centroid[0] * (1 / 3)), 0]
                     ws = [
@@ -316,7 +315,7 @@ class ShadowDetecter:
                             ss_score += 1
 
                     self.debugger.matrix(ss_score, 'Shadow Segment Score')
-                    if ss_score > 4:
+                    if ss_score > self.config['ss_score_thresh']:
                         ss_labels.append(label)
 
         self.debugger.matrix(ss_labels, 'Shadow Segment Labels')
@@ -361,7 +360,7 @@ class ShadowDetecter:
         self.debugger.param(most_clst, 'most_clst:')
         self.debugger.param(most_clst_mean, 'most_clst_mean:')
         if counter[most_clst] < len(cluster) * 0.2: return None, None
-        if means[low_mean_clst] * 2 > most_clst_mean: return None, None
+        if means[low_mean_clst] * self.config['sc_color_thresh'] > most_clst_mean: return None, None
         self.debugger.param(low_mean_clst, 'shadow_clst:')
 
         return low_mean_clst, most_clst_mean
@@ -583,50 +582,6 @@ class ShadowDetecter:
         # stat is [tl_x, tl_y, w, h, area]
         label_list = [i+1 for i in range(num - 1)]
         return label_map, stats[1:], label_list
-
-
-    def old_detect(self, img, mask, img_with_mask):
-        # extract bottom part of the image with mask
-        H, W = mask.shape[0], mask.shape[1]
-        for box in bboxes:
-            half_w, half_h = int((box[2] - box[0]) / 2), int((box[3] - box[1]) / 2)
-            box[0] = box[0] - half_w if box[0] - half_w >= 0 else 0
-            box[1] = box[1] + half_h if box[1] + half_h < H else H - 2 # half of the car height
-            box[2] = box[2] + half_w if box[2] + half_w < W else W - 1
-            box[3] = box[3] + half_h if box[3] + half_h < H else H - 1
-
-        # check extracted bboxes area
-        tmp = mask.astype(np.uint8).copy()
-        for box in bboxes:
-            tmp = cv2.rectangle(tmp, (box[0], box[1]), (box[2], box[3]), 255, 1)
-
-        # visualization
-        self.debug.img(out2, 'expanded bounding boxes')
-
-
-        cars = []
-        for box in bboxes:
-            car = img_with_mask[box[1]:box[3], box[0]:box[2], :]
-            self.debug.img(car, 'car part')
-            cars.append(car)
-
-        # the pixel of car part
-        car_y, car_x = np.where(car_map==255)
-        car_pos = np.array([car_x, car_y])
-
-        # apply SLIC to car part images
-        for car in cars:
-            segmap, num = self._slic(car)
-            segmap = segmap + 1
-            car_gray = car.astype(np.int64)
-            car_gray = np.sum(car_gray, axis=-1)
-            self.debug.matrix(car_gray, 'car')
-            segmap = np.where(car_gray==255*3, 0, segmap)
-            self.debug.matrix(segmap, 'segmap')
-            for idx in range(num):
-                y, x = np.where(segmap==idx)
-                segment_mean_color = np.sum(np.sum(car_gray[y][:, x], axis=0), axis=0)
-                self.debug.matrix(segment_mean_color, 'segment mean color')
 
 
     def _superpixel(self, img, method, ngc=False):

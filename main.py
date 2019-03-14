@@ -21,10 +21,14 @@ if __name__ == '__main__':
     config = {
             # checkpoint
             'checkpoint': 'data/exp/cityscapes_testset',
+
+            # resize
+            'resize_factor': 1,
         
             # mode
             'semseg_mode': 'save',
             'mask_mode': 'save',
+            'shadow_mode': 'save',
             'inpaint_mode': 'save',
         
             # segmentation
@@ -32,7 +36,17 @@ if __name__ == '__main__':
             'resnet': 18,
 
             # mask
-            'mask': 'separate',
+            'mask': 'entire',
+            # separate
+            'crop_rate': 0.5,
+
+            # shadow detection
+            'obj_sml_thresh': 1e-3,
+            'obj_high_thresh': 0.2,
+            'superpixel': 'quickshift',
+            'shadow_high_thresh': 0.01,
+            'ss_score_thresh': 4,
+            'sc_color_thresh': 1.5,
 
             # inpaint
             'inpaint': 'EdgeConnect',
