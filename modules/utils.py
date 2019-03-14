@@ -26,14 +26,15 @@ def tensor_img_to_numpy(tensor):
 
 
 class Debugger:
-    def __init__(self, debug, save, output_dir=None):
+    def __init__(self, main, debug, save=False, output_dir=None):
+        self.main = main
         self.debug = debug
         self.save = save
         self.order = 0
         self.output_dir = output_dir
 
-    def img(self, img, comment, gray=False):
-        if self.debug:
+    def img(self, img, comment, gray=False, main=False):
+        if self.debug or (self.main and main):
             print(comment)
             if type(img) is torch.Tensor and len(list(img.shape)) == 3:
                 img = tensor_img_to_numpy(img)
@@ -54,13 +55,15 @@ class Debugger:
                     self.order += 1
 
 
-    def param(self, string):
-        if self.debug:
-            print(string)
+    def param(self, param, comment, main=False):
+        if self.debug or (self.main and main):
+            print('-----', comment, '-----')
+            print(param)
+            print('-' * (len(comment) + 12))
 
 
-    def imsave(self, img, path):
-        if self.debug:
+    def imsave(self, img, path, main=False):
+        if self.debug or (self.main and main):
             print(img.shape)
             if type(img) is torch.Tensor:
                 img = img.cpu().numpy().astype(np.uint8)
@@ -72,10 +75,9 @@ class Debugger:
                 raise RuntimeError('The type of input image must be numpy.ndarray or torch.Tensor.')
 
 
-    def matrix(self, mat, comment):
-        if self.debug:
+    def matrix(self, mat, comment, main=False):
+        if self.debug or (self.main and main):
             print('-----', comment, '-----')
-            # try:
             if type(mat) is torch.Tensor:
                 if 'float' in str(mat.dtype):
                     print('shape: {}   dtype: {}   min: {}   mean: {}   max: {}   device: {}'.format(
@@ -85,10 +87,15 @@ class Debugger:
                         mat.shape, mat.dtype, mat.min(), mat.to(torch.float32).mean(), mat.max(), mat.device))
 
             elif type(mat) is np.ndarray:
-                print('shape: {}   dtype: {}   min: {}   mean: {}   max: {}'.format(
-                    mat.shape, mat.dtype, mat.min(), mat.mean(), mat.max()))
-            # except:
-            #     print(mat)
+                if mat.shape[0] == 0:
+                    print(mat)
+                else:
+                    print('shape: {}   dtype: {}   min: {}   mean: {}   max: {}'.format(
+                        mat.shape, mat.dtype, mat.min(), mat.mean(), mat.max()))
+            else:
+                print('[Warning] Input type is {}, not matrix(numpy.ndarray or torch.tensor)!'.format(
+                    type(mat)))
+                print(mat)
             print('-' * (len(comment) + 12))
 
 

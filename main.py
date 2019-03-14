@@ -6,9 +6,9 @@ from modules.ganonymizer import GANonymizer
 from modules.utils import Debugger, set_networks, labels
 
 
-def main(img, config, debug=False, save=False):
+def main(img, config, main=False, debug=False):
     # setup environment
-    debugger = Debugger(debug, save)
+    debugger = Debugger(main, debug)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # model prediction
@@ -21,9 +21,13 @@ if __name__ == '__main__':
     config = {
             # checkpoint
             'checkpoint': 'data/exp/cityscapes_testset',
+
+            # resize
+            'resize_factor': 1,
         
             # mode
             'semseg_mode': 'save',
+            'mask_mode': 'save',
             'shadow_mode': 'save',
             'inpaint_mode': 'save',
         
@@ -31,11 +35,26 @@ if __name__ == '__main__':
             'semseg': 'DeepLabV3',
             'resnet': 18,
 
+            # mask
+            'mask': 'entire',
+            # separate
+            'crop_rate': 0.5,
+
+            # shadow detection
+            'obj_sml_thresh': 1e-3,
+            'obj_high_thresh': 0.2,
+            'superpixel': 'quickshift',
+            'shadow_high_thresh': 0.01,
+            'alw_range_max': 30,
+            'find_iteration': 3,
+            'ss_score_thresh': 4,
+            'sc_color_thresh': 1.5,
+
             # inpaint
             'inpaint': 'EdgeConnect',
             'checkpoints_path': 'modules/edge_connect/checkpoints',
             'sigma': 2
             }
 
-    main(img, config, debug=True, save=False)
+    main(img, config, main=False, debug=False, save=False)
 
