@@ -6,6 +6,7 @@ from skimage import color
 from skimage.segmentation import felzenszwalb, slic, quickshift, mark_boundaries
 from skimage.future import graph
 from sklearn.cluster import MeanShift
+from skimage.measure import regionprops
 
 from .utils import expand_mask, detect_object, Debugger
 
@@ -146,7 +147,6 @@ class ShadowDetecter:
 
         # create rag
         G = graph.rag_mean_color(img, segmap, mode='similarity')
-        graph.show_rag(segmap, G, img)
 
         # create labels list and segment median colors list (convert grayscale)
         labels = []
@@ -211,23 +211,19 @@ class ShadowDetecter:
         # create rag
         G = graph.rag_mean_color(img, segmap, mode='similarity')
 
-        # visualize for calcurating centroid
-        lc = graph.show_rag(segmap, G, img)
-        cbar = plt.colorbar(lc)
-
         outside = np.max(segmap)
         ss_labels = []
         for node in G.nodes:
             label = G.nodes[node]['labels'][0]
             if label != outside:
-                centroid = np.array(G.nodes[node]['centroid'])
+                # centroid = np.array(G.nodes[node]['centroid'])
+                centroid = self._calc_centroid(segmap, label)
 
                 # calcurate boundingbox of segmap
                 H, W = img.shape[0], img.shape[1] 
                 ys, xs = np.where(segmap == label)
                 box = [np.min(xs), np.min(ys), np.max(xs), np.max(ys)]
                 width, height = box[2] - box[0], box[3] - box[1]
-
 
                 if centroid[0] > H * self.config['shadow_high_thresh']:
                     # create check pixels for checking whether a segment is under the object
@@ -243,11 +239,11 @@ class ShadowDetecter:
                             checkpxs.append([h, w])
                     checkpxs = np.array(checkpxs)
 
-                    # # visualize check pixel place
-                    # vis = img.copy()
-                    # for cpx in checkpxs:
-                    #     vis[cpx[0], cpx[1], :] = (0, 255, 255)
-                    # self.debugger.img(vis, 'check pixel visualization')
+                    # visualize check pixel place
+                    vis = img.copy()
+                    for cpx in checkpxs:
+                        vis[cpx[0], cpx[1], :] = (0, 255, 255)
+                    self.debugger.img(vis, 'check pixel visualization')
 
                     # calcurate the shadow segment score (ss_score)
                     ss_score = 0
@@ -264,6 +260,12 @@ class ShadowDetecter:
         ss_segmap = self._filtered_segmap(img, segmap, ss_labels)
 
         return ss_segmap, ss_labels
+
+
+    def _calc_centroid(self, segmap, label):
+        segment = np.where(segmap == label, 255, 0).astype(np.uint8)
+        centroid = regionprops(segment)[0]['centroid']
+        return np.array(centroid).astype(np.int32)
 
 
     def _get_sc_segmap(self, img, segmap, cluster, labels, sc):
@@ -333,8 +335,9 @@ class ShadowDetecter:
         self.debugger.matrix(gray, 'Mean of Segment Median Color')
         order = np.argsort(gray)
         gray, label = gray[order], label[order]
-        plt.figure(figsize=(10, 10), dpi=200)
-        plt.bar(np.arange(gray.shape[0]), gray,
+        if self.config['shadow_mode'] == 'debug':
+            plt.figure(figsize=(10, 10), dpi=200)
+            plt.bar(np.arange(gray.shape[0]), gray,
                 tick_label=label, align='center')
 
         return label, gray
