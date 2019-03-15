@@ -6,6 +6,7 @@ import numpy as np
 from PIL import Image
 from torchvision.transforms import ToTensor, ToPILImage
 from .semantic_segmenter import SemanticSegmenter
+from .mask_creater import MaskCreater
 from .shadow_detecter import ShadowDetecter
 from .inpainter import Inpainter
 from .utils import tensor_img_to_numpy
@@ -19,6 +20,7 @@ class GANonymizer:
         self.to_tensor = ToTensor()
 
         self.semseger = SemanticSegmenter(config, device, debugger)
+        self.mask_creater = MaskCreater(config, debugger)
         self.shadow_detecter = ShadowDetecter(config, debugger)
         self.inpainter = Inpainter(config, device, debugger)
 
@@ -39,6 +41,9 @@ class GANonymizer:
             omask = self._object_mask(img, segmap)
             smask = self._detect_shadow(img, omask)
             mask = self._combine_masks(img, omask, smask)
+
+            # Psuedo Mask Division
+            img, mask = self._divide_mask(img, mask)
 
             # image and edge inpainting
             out, _ = self._inpaint(img, mask)
@@ -137,12 +142,12 @@ class GANonymizer:
         omask_path = os.path.join(self.config['checkpoint'], self.fname + '_omask.' + 'pkl')
 
         if self.config['mask_mode'] is 'exec':
-            omask = self.shadow_detecter.mask(img, semseg_map, self.labels)
+            omask = self.mask_creater.mask(img, semseg_map, self.labels)
         elif self.config['mask_mode'] is 'pass':
             with open(omask_path, mode='rb') as f:
                 omask = pickle.load(f)
         elif self.config['mask_mode'] is 'save':
-            omask = self.shadow_detecter.mask(img, semseg_map, self.labels)
+            omask = self.mask_creater.mask(img, semseg_map, self.labels)
             with open(omask_path, mode='wb') as f:
                 pickle.dump(omask, f)
 
@@ -211,6 +216,12 @@ class GANonymizer:
         self.debugger.imsave(overlay, self.fname + '_smask_overlayed.' + self.fext, main=True)
 
         return smask
+
+
+    def _divide_mask(self, img, mask):
+        # pseudo mask division
+        print('===== Pseudo Mask Division =====')
+        
 
 
     def _inpaint(self, img, mask):

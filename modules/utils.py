@@ -26,6 +26,21 @@ def tensor_img_to_numpy(tensor):
     return array
 
 
+def detect_object(img):
+    num, label_map, stats, _ = cv2.connectedComponentsWithStats(img)
+    # stat is [tl_x, tl_y, w, h, area]
+    label_list = [i+1 for i in range(num - 1)]
+    return label_map, stats[1:], label_list
+
+
+def expand_mask(mask):
+    mask = mask.astype(np.uint8)
+    width = int((mask.shape[0] + mask.shape[1]) / 500)
+    contours, hierarchy = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    mask = cv2.drawContours(mask, contours, -1, 255, width) 
+    return mask.astype(np.uint8)
+
+
 class Debugger:
     def __init__(self, main, debug, save, save_dir=None):
         self.main = main
