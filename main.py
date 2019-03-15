@@ -6,9 +6,9 @@ from modules.ganonymizer import GANonymizer
 from modules.utils import Debugger, set_networks, labels
 
 
-def main(img, config, main=False, debug=False):
+def main(img, config, main=False, debug=False, save=False):
     # setup environment
-    debugger = Debugger(main, debug)
+    debugger = Debugger(main, debug, save, save_dir=config['checkpoint'])
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # model prediction
@@ -52,7 +52,7 @@ if __name__ == '__main__':
 
             # inpaint
             'inpaint': 'EdgeConnect',
-            'checkpoints_path': 'modules/edge_connect/checkpoints',
+            'inpaint_ckpt': 'modules/edge_connect/checkpoints',
             'sigma': 2
             }
 

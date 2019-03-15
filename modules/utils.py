@@ -2,6 +2,7 @@ import os
 import cv2
 import torch
 import numpy as np
+from PIL import Image
 import matplotlib.pyplot as plt
 from collections import namedtuple
 
@@ -26,12 +27,12 @@ def tensor_img_to_numpy(tensor):
 
 
 class Debugger:
-    def __init__(self, main, debug, save=False, output_dir=None):
+    def __init__(self, main, debug, save, save_dir=None):
         self.main = main
         self.debug = debug
         self.save = save
         self.order = 0
-        self.output_dir = output_dir
+        self.save_dir = save_dir
 
     def img(self, img, comment, gray=False, main=False):
         if self.debug or (self.main and main):
@@ -45,15 +46,6 @@ class Debugger:
                 plt.gray()
             plt.show()
 
-            if self.save:
-                if self.output_dir is None:
-                    raise RuntimeError('Please specify output directory for saving images')
-                else:
-                    filepath = os.path.join(self.output_dir, str(self.order) 
-                            + '_' + comment[:5] + '.png')
-                    self.imsave(img, filepath)
-                    self.order += 1
-
 
     def param(self, param, comment, main=False):
         if self.debug or (self.main and main):
@@ -62,15 +54,17 @@ class Debugger:
             print('-' * (len(comment) + 12))
 
 
-    def imsave(self, img, path, main=False):
-        if self.debug or (self.main and main):
+    def imsave(self, img, filename, main=False):
+        if (self.debug or (self.main and main)) and self.save:
             print(img.shape)
+            path = os.path.join(self.save_dir, filename)
             if type(img) is torch.Tensor:
                 img = img.cpu().numpy().astype(np.uint8)
                 img = Image.fromarray(img)
                 img.save(path)
             elif type(img) is np.ndarray:
-                cv2.imwrite(path, img)
+                img = Image.fromarray(img)
+                img.save(path)
             else:
                 raise RuntimeError('The type of input image must be numpy.ndarray or torch.Tensor.')
 
