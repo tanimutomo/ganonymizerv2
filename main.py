@@ -25,10 +25,11 @@ if __name__ == '__main__':
             'resize_factor': 1,
         
             # mode (choose in ['pass', 'exec', 'debug', 'save'])
-            'main_mode': 'debug',
+            'main_mode': 'exec',
             'semseg_mode': 'pass',
             'mask_mode': 'exec',
             'shadow_mode': 'exec',
+            'divide_mode': 'exec',
             'inpaint_mode': 'pass',
 
             # segmentation
