@@ -93,7 +93,7 @@ class GANonymizer:
         print('===== Semantic Segmentation =====')
 
         segmap_path = os.path.join(self.config['checkpoint'], self.fname + '_segmap.' + 'pkl')
-        if self.config['semseg_mode'] is 'exec':
+        if self.config['semseg_mode'] in ['exec', 'debug']:
             semseg_map = self.semseger.process(img)
         elif self.config['semseg_mode'] is 'pass':
             with open(segmap_path, mode='rb') as f:
@@ -142,7 +142,7 @@ class GANonymizer:
         print('===== Creating Mask Image =====')
         omask_path = os.path.join(self.config['checkpoint'], self.fname + '_omask.' + 'pkl')
 
-        if self.config['mask_mode'] is 'exec':
+        if self.config['mask_mode'] in ['exec', 'debug']:
             omask = self.mask_creater.mask(img, semseg_map, self.labels)
         elif self.config['mask_mode'] is 'pass':
             with open(omask_path, mode='rb') as f:
@@ -172,7 +172,7 @@ class GANonymizer:
         print('===== Create separated inputs =====')
         sep_inputs_path = os.path.join(self.config['checkpoint'], self.fname + '_sep_inputs.' + 'pkl')
 
-        if self.config['mask_mode'] is 'exec':
+        if self.config['mask_mode'] in ['exec', 'debug']:
             inputs = self.shadow_detecter.separated_mask(img, semseg_map, 
                     self.config['crop_rate'], self.labels)
         elif self.config['mask_mode'] is 'pass':
@@ -192,7 +192,7 @@ class GANonymizer:
         print('===== Shadow Detection =====')
         smask_path = os.path.join(self.config['checkpoint'], self.fname + '_smask.' + 'pkl')
 
-        if self.config['shadow_mode'] is 'exec':
+        if self.config['shadow_mode'] in ['exec', 'debug']:
             smask = self.shadow_detecter.detect(img, mask)
         elif self.config['shadow_mode'] is 'pass':
             with open(smask_path, mode='rb') as f:
@@ -231,7 +231,7 @@ class GANonymizer:
         inpaint_path = os.path.join(self.config['checkpoint'], self.fname + '_inpaint.' + 'pkl')
         inpaint_edge_path = os.path.join(self.config['checkpoint'], self.fname + '_inpaint_edge.' + 'pkl')
 
-        if self.config['inpaint_mode'] is 'exec':
+        if self.config['inpaint_mode'] in ['exec', 'debug']:
             inpainted, inpainted_edge = self.inpainter.inpaint(img, mask)
         elif self.config['inpaint_mode'] is 'pass':
             with open(inpaint_path, mode='rb') as f:
