@@ -8,6 +8,7 @@ from torchvision.transforms import ToTensor, ToPILImage
 from .semantic_segmenter import SemanticSegmenter
 from .mask_creater import MaskCreater
 from .shadow_detecter import ShadowDetecter
+from .mask_divider import MaskDivider
 from .inpainter import Inpainter
 from .utils import tensor_img_to_numpy, Debugger
 
@@ -24,6 +25,7 @@ class GANonymizer:
         self.mask_creater = MaskCreater(config)
         self.shadow_detecter = ShadowDetecter(config)
         self.inpainter = Inpainter(config, device)
+        self.mask_divider = MaskDivider(config, self.inpainter)
 
     
     def predict(self, img_path):
@@ -220,8 +222,7 @@ class GANonymizer:
     def _divide_mask(self, img, mask):
         # pseudo mask division
         print('===== Pseudo Mask Division =====')
-        pass
-        
+        self.mask_divider.divide(img, mask)
 
 
     def _inpaint(self, img, mask):
