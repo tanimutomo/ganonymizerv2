@@ -22,7 +22,7 @@ class Inpainter():
 
     def _set_edge_connect(self):
         model = SimpleEdgeConnect(
-                self.config['checkpoints_path'], self.config['sigma'], self.device, self.debugger)
+                self.config['inpaint_ckpt'], self.config['sigma'], self.device, self.debugger)
         return model
 
 
