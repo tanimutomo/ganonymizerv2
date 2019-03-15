@@ -8,7 +8,7 @@ from modules.utils import Debugger, set_networks, labels
 
 def main(img, config):
     # setup environment
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
 
     # model prediction
     model = GANonymizer(config, device, labels)
@@ -25,10 +25,11 @@ if __name__ == '__main__':
             'resize_factor': 1,
         
             # mode (choose in ['pass', 'exec', 'debug', 'save'])
-            'main_mode': 'debug',
+            'main_mode': 'exec',
             'semseg_mode': 'pass',
             'mask_mode': 'exec',
             'shadow_mode': 'exec',
+            'divide_mode': 'exec',
             'inpaint_mode': 'pass',
 
             # segmentation

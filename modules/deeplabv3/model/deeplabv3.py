@@ -42,6 +42,8 @@ class DeepLabV3(nn.Module):
             self.resnet = ResNet18_OS152(os.path.join(res_path, weight_name), self.device)
             self.aspp = ASPP_Bottleneck(num_classes=self.num_classes)
 
+        self.resnet.to(self.device)
+        self.aspp.to(self.device)
 
 
     def forward(self, x):

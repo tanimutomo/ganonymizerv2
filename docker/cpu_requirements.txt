@@ -3,8 +3,9 @@ scipy ~= 1.0.1
 future ~= 0.16.0
 matplotlib ~= 2.2.2
 pillow ~= 5.0.0
-opencv-python ~= 3.4.0
+opencv-contrib-python ~= 4.0.0
 scikit-image ~= 0.14.0
+scikit-learn
 pyyaml
 torch==1.0.0
 torchvision

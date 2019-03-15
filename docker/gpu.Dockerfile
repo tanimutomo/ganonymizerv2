@@ -63,7 +63,7 @@ RUN ${PIP} install --upgrade \
     setuptools
 
 # begin install for opencv
-RUN OPENCV_VERSION="3.4.3" && \
+RUN OPENCV_VERSION="4.0.0" && \
         mkdir -p /tmp/opencv && cd /tmp/opencv && \ 
         wget https://github.com/opencv/opencv/archive/${OPENCV_VERSION}.zip && \
         unzip ${OPENCV_VERSION}.zip -d . && \
