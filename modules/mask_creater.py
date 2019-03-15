@@ -1,14 +1,14 @@
 import cv2
 import numpy as np
 
-from utils import expand_mask, detect_object
+from .utils import expand_mask, detect_object, Debugger
 
 
 class MaskCreater:
-    def __init__(self, config, debugger):
+    def __init__(self, config):
         self.config = config
-        self.debugger = debugger
         self.thresh = 3
+        self.debugger = Debugger(config['mask_mode'], save_dir=config['checkpoint'])
 
     
     def mask(self, img, segmap, labels):

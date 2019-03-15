@@ -7,14 +7,14 @@ from skimage.segmentation import felzenszwalb, slic, quickshift, mark_boundaries
 from skimage.future import graph
 from sklearn.cluster import MeanShift
 
-from utils import expand_mask, detect_object
+from .utils import expand_mask, detect_object, Debugger
 
 
 class ShadowDetecter:
-    def __init__(self, config, debugger):
+    def __init__(self, config):
         self.config = config
-        self.debugger = debugger
         self.thresh = 3
+        self.debugger = Debugger(config['shadow_mode'], save_dir=config['checkpoint'])
 
 
     def detect(self, img, mask):

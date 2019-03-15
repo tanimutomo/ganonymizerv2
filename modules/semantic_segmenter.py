@@ -1,14 +1,14 @@
 import os
 import torch
 from .deeplabv3.model.deeplabv3 import DeepLabV3
-from .utils import tensor_img_to_numpy
+from .utils import tensor_img_to_numpy, Debugger
 
 class SemanticSegmenter():
-    def __init__(self, config, device, debugger):
+    def __init__(self, config, device):
         self.network = config['semseg']
         self.resnet = config['resnet']
         self.device = device
-        self.debugger = debugger
+        self.debugger = Debugger(config['semseg_mode'], save_dir=config['checkpoint'])
 
         if self.network == 'DeepLabV3':
             self.model = self._set_deeplabv3()
