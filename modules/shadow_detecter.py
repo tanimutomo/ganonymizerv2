@@ -7,78 +7,19 @@ from skimage.segmentation import felzenszwalb, slic, quickshift, mark_boundaries
 from skimage.future import graph
 from sklearn.cluster import MeanShift
 
+from .utils import expand_mask, detect_object, Debugger
+
 
 class ShadowDetecter:
-    def __init__(self, config, debugger):
+    def __init__(self, config):
         self.config = config
-        self.debugger = debugger
         self.thresh = 3
-
-    
-    def mask(self, img, segmap, labels):
-        # collect dynamic object's id
-        dynamic_object_ids = []
-        for label in labels:
-            if (label.category is 'vehicle' or label.category is 'human') and label.trainId is not 19:
-                dynamic_object_ids.append(label.trainId)
-
-        # create the mask image using only segmap
-        obj_mask = segmap.copy()
-        for do_id in dynamic_object_ids:
-            obj_mask = np.where(obj_mask==do_id, 255, obj_mask).astype(np.uint8)
-        obj_mask = np.where(obj_mask==255, 255, 0)
-
-        # expnad mask area by contours
-        # obj_mask = self._expand_mask(obj_mask)
-
-        return obj_mask.astype(np.uint8)
-
-
-    def separated_mask(self, img, segmap, crop_rate, labels):
-        mask, _ = self.mask(img, segmap, labels)
-        H, W = mask.shape
-        label_map, stats, labels = self._detect_object(mask)
-        inputs = []
-        
-        for label, stat in zip(labels, stats):
-            box = np.array([0, 0, 0, 0])
-            obj = np.where(label_map==label, 255, 0).astype(np.uint8)
-            tl = np.array([stat[0], stat[1]])
-            w, h = stat[2], stat[3]
-            br = np.array([stat[0] + w, stat[1] + h])
-            center = np.floor(((br + tl) / 2)).astype(np.int32)
-            area = stat[4]
-
-            if w*3 > 256:
-                box[0], box[2] = self._crop_obj(tl[0], br[0],
-                        int(w / crop_rate), 0, W)
-
-            else:
-                box[0], box[2] = self._crop_obj(center[0], center[0], 128, 0, W)
-                    
-            if h*3 > 256:
-                box[1], box[3] = self._crop_obj(tl[1], br[1],
-                        int(h / crop_rate), 0, H)
-
-            else:
-                box[1], box[3] = self._crop_obj(center[1], center[1], 128, 0, H)
-
-            img_part = img[box[1]:box[3], box[0]:box[2], :]
-            mask_part = obj[box[1]:box[3], box[0]:box[2]]
-
-            img_part = self._adjust_imsize(img_part)
-            mask_part = self._adjust_imsize(mask_part)
-
-            assert (img_part.shape[0], img_part.shape[1]) == (mask_part.shape[0], mask_part.shape[1])
-            inputs.append({'img': img_part, 'mask': mask_part, 
-                'box': box, 'new_size': mask_part.shape, 'area': area})
-
-        return inputs
+        self.debugger = Debugger(config['shadow_mode'], save_dir=config['checkpoint'])
 
 
     def detect(self, img, mask):
         # connected components
-        label_map, stats, labels = self._detect_object(mask)
+        label_map, stats, labels = detect_object(mask)
         shadow_masks = []
 
         for label, stat in zip(labels, stats):
@@ -175,7 +116,7 @@ class ShadowDetecter:
             # add all shadow mask dict
             shadow_masks.append({'bbox': bbox, 'mask': shadow_mask})
 
-        return self._expand_mask(
+        return expand_mask(
                 self._combine_masks(
                     mask.shape, shadow_masks
                     )
@@ -475,49 +416,6 @@ class ShadowDetecter:
         return np.array([np.min(x), np.min(y), np.max(x), np.max(y)])
 
 
-    def _crop_obj(self, top, bot, base, min_thresh, max_thresh):
-        if top - base >= min_thresh:
-            ntop = top - base
-            extra = 0
-        else:
-            ntop = min_thresh
-            extra = min_thresh - (top - base)
-
-        if bot + base + extra < max_thresh:
-            nbot = bot + base + extra
-            extra = 0
-        else:
-            nbot = max_thresh
-            extra = bot + base + extra - max_thresh
-
-        ntop = ntop - extra if ntop - extra >= min_thresh else min_thresh
-
-        return ntop, nbot
-
-    
-    def _adjust_imsize(self, img):
-        size = np.array([img.shape[0], img.shape[1]])
-        nsize = np.array([0, 0])
-        argmax = np.argmax(size)
-        if size[argmax] > 300:
-            argmin = np.argmin(size)
-            rate = 300 / size[argmax]
-            nsize[argmax] = 300
-            nsize[argmin] = np.ceil(size[argmin] * rate).astype(np.int32)
-        else:
-            nsize = size.copy()
-
-        nsize[0] = nsize[0] if nsize[0] % 4 == 0 else nsize[0] - (nsize[0] % 4)
-        nsize[1] = nsize[1] if nsize[1] % 4 == 0 else nsize[1] - (nsize[1] % 4)
-        out = cv2.resize(img, (nsize[1], nsize[0]))
-
-        return out
-
-
-    def _obj_area_filter(self, bot, obj):
-        return np.where(obj==255, 0, bot)
-
-        
     def _extract_obj_bot(self, img):
         H, W = img.shape
         # find contours
@@ -573,18 +471,6 @@ class ShadowDetecter:
         return out
 
 
-    def _draw_contours(self, img, contours, area):
-        width = int(np.sqrt(area))
-        return cv2.drawContours(img, contours, -1, 127, width) 
-            
-
-    def _detect_object(self, img):
-        num, label_map, stats, _ = cv2.connectedComponentsWithStats(img)
-        # stat is [tl_x, tl_y, w, h, area]
-        label_list = [i+1 for i in range(num - 1)]
-        return label_map, stats[1:], label_list
-
-
     def _superpixel(self, img, method, ngc=False):
         if method == 'slic':
             num_segments = int(img.shape[0] * img.shape[1] / 100)
@@ -614,29 +500,5 @@ class ShadowDetecter:
         ms.fit(data)
         out = ms.labels_
         return out
-
-
-    def _expand_mask(self, mask):
-        mask = mask.astype(np.uint8)
-        width = int((mask.shape[0] + mask.shape[1]) / 500)
-        self.debugger.param(width, 'mask expand width')
-        contours, hierarchy = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-        mask = cv2.drawContours(mask, contours, -1, 255, width) 
-        
-        return mask.astype(np.uint8)
-
-
-    def _get_obj_bbox(self, img):
-        out = img.astype(np.uint8)
-        contours, _ = cv2.findContours(img, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-        bboxes = []
-        thresh = 10000
-        for cnt in contours:
-            x, y, w, h = cv2.boundingRect(cnt)
-            out = cv2.rectangle(out, (x, y), (x+w, y+h), 255, 2)
-            if w*h >= thresh:
-                bboxes.append([x, y, x+w, y+h])
-
-        return out, bboxes
 
 

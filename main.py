@@ -6,31 +6,31 @@ from modules.ganonymizer import GANonymizer
 from modules.utils import Debugger, set_networks, labels
 
 
-def main(img, config, main=False, debug=False, save=False):
+def main(img, config):
     # setup environment
-    debugger = Debugger(main, debug, save, save_dir=config['checkpoint'])
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # model prediction
-    model = GANonymizer(config, device, labels, debugger)
+    model = GANonymizer(config, device, labels)
     model.predict(img)
 
 
 if __name__ == '__main__':
     img = os.path.join(os.getcwd(), 'data/exp/cityscapes_testset/ex_01.png')
     config = {
-            # checkpoint
+            # execution setting
             'checkpoint': 'data/exp/cityscapes_testset',
 
             # resize
             'resize_factor': 1,
         
-            # mode
-            'semseg_mode': 'save',
-            'mask_mode': 'save',
-            'shadow_mode': 'save',
-            'inpaint_mode': 'save',
-        
+            # mode (choose in ['pass', 'exec', 'debug', 'save'])
+            'main_mode': 'debug',
+            'semseg_mode': 'pass',
+            'mask_mode': 'exec',
+            'shadow_mode': 'exec',
+            'inpaint_mode': 'pass',
+
             # segmentation
             'semseg': 'DeepLabV3',
             'resnet': 18,
@@ -45,7 +45,7 @@ if __name__ == '__main__':
             'obj_high_thresh': 0.2,
             'superpixel': 'quickshift',
             'shadow_high_thresh': 0.01,
-            'alw_range_max': 30,
+            'alw_range_max': 15,
             'find_iteration': 3,
             'ss_score_thresh': 4,
             'sc_color_thresh': 1.5,
@@ -55,6 +55,6 @@ if __name__ == '__main__':
             'inpaint_ckpt': 'modules/edge_connect/checkpoints',
             'sigma': 2
             }
-
-    main(img, config, main=False, debug=False, save=False)
+    
+    main(img, config)
 

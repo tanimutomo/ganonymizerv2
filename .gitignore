@@ -115,6 +115,7 @@ kronos-config.yml
 modules/deeplabv3/pretrained/
 modules/edge_connect/docker/
 modules/edge_connect/kronos-config.yml
+modules/olds.py
 data/exp/
 *.png
 *.pth

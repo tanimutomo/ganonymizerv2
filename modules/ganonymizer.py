@@ -6,24 +6,27 @@ import numpy as np
 from PIL import Image
 from torchvision.transforms import ToTensor, ToPILImage
 from .semantic_segmenter import SemanticSegmenter
+from .mask_creater import MaskCreater
 from .shadow_detecter import ShadowDetecter
+from .mask_divider import MaskDivider
 from .inpainter import Inpainter
-from .utils import tensor_img_to_numpy
+from .utils import tensor_img_to_numpy, Debugger
 
 class GANonymizer:
-    def __init__(self, config, device, labels, debugger):
+    def __init__(self, config, device, labels):
         self.config = config
         self.devide = device
         self.labels = labels
 
+        self.debugger = Debugger(config['main_mode'], save_dir=config['checkpoint'])
         self.to_tensor = ToTensor()
 
-        self.semseger = SemanticSegmenter(config, device, debugger)
-        self.shadow_detecter = ShadowDetecter(config, debugger)
-        self.inpainter = Inpainter(config, device, debugger)
+        self.semseger = SemanticSegmenter(config, device)
+        self.mask_creater = MaskCreater(config)
+        self.shadow_detecter = ShadowDetecter(config)
+        self.inpainter = Inpainter(config, device)
+        self.mask_divider = MaskDivider(config, self.inpainter)
 
-        self.debugger = debugger
-    
     
     def predict(self, img_path):
         # loading input image
@@ -39,6 +42,9 @@ class GANonymizer:
             omask = self._object_mask(img, segmap)
             smask = self._detect_shadow(img, omask)
             mask = self._combine_masks(img, omask, smask)
+
+            # Psuedo Mask Division
+            self._divide_mask(img, mask)
 
             # image and edge inpainting
             out, _ = self._inpaint(img, mask)
@@ -76,8 +82,8 @@ class GANonymizer:
         img = np.array(img)
 
         # visualization
-        self.debugger.matrix(img, 'Input Image', main=True)
-        self.debugger.img(img, 'Input Image', main=True)
+        self.debugger.matrix(img, 'Input Image')
+        self.debugger.img(img, 'Input Image')
 
         return img
 
@@ -98,9 +104,9 @@ class GANonymizer:
                 pickle.dump(semseg_map, f)
 
         # visualization
-        self.debugger.matrix(semseg_map, 'Semantic Segmentation Map Prediction by DeepLabV3', main=True)
-        self.debugger.img(semseg_map, 'Semantic Segmentation Map Prediction by DeepLabV3', main=True)
-        self.debugger.imsave(semseg_map, self.fname + '_semsegmap.' + self.fext, main=True)
+        self.debugger.matrix(semseg_map, 'Semantic Segmentation Map Prediction by DeepLabV3')
+        self.debugger.img(semseg_map, 'Semantic Segmentation Map Prediction by DeepLabV3')
+        self.debugger.imsave(semseg_map, self.fname + '_semsegmap.' + self.fext)
 
         return semseg_map
 
@@ -111,22 +117,22 @@ class GANonymizer:
 
         # combine the object mask and the shadow mask
         mask = np.where(omask + smask > 0, 255, 0).astype(np.uint8)
-        self.debugger.matrix(mask, 'Mask (Object Mask + Shadow Mask)', main=True)
-        self.debugger.img(mask, 'Mask (Object Mask + Shadow Mask)', main=True, gray=True)
-        self.debugger.imsave(mask, self.fname + '_mask.' + self.fext, main=True)
+        self.debugger.matrix(mask, 'Mask (Object Mask + Shadow Mask)')
+        self.debugger.img(mask, 'Mask (Object Mask + Shadow Mask)', gray=True)
+        self.debugger.imsave(mask, self.fname + '_mask.' + self.fext)
 
         # visualization the mask overlayed image
         mask3c = np.stack([mask, np.zeros_like(mask), np.zeros_like(mask)], axis=-1)
         overlay = (img * 0.7 + mask3c * 0.3).astype(np.uint8)
-        self.debugger.matrix(overlay, 'Mask Overlayed Image', main=True)
-        self.debugger.img(overlay, 'Mask Overlayed Image', main=True)
-        self.debugger.imsave(overlay, self.fname + '_mask_overlayed.' + self.fext, main=True)
+        self.debugger.matrix(overlay, 'Mask Overlayed Image')
+        self.debugger.img(overlay, 'Mask Overlayed Image')
+        self.debugger.imsave(overlay, self.fname + '_mask_overlayed.' + self.fext)
 
         # image with mask
         mask3c = np.stack([mask for _ in range(3)], axis=-1)
         img_with_mask = np.where(mask3c==255, mask3c, img).astype(np.uint8)
-        self.debugger.img(img_with_mask, 'Image with Mask', main=True)
-        self.debugger.imsave(img_with_mask, self.fname + '_img_with_mask.' + self.fext, main=True)
+        self.debugger.img(img_with_mask, 'Image with Mask')
+        self.debugger.imsave(img_with_mask, self.fname + '_img_with_mask.' + self.fext)
 
         return mask
 
@@ -137,26 +143,26 @@ class GANonymizer:
         omask_path = os.path.join(self.config['checkpoint'], self.fname + '_omask.' + 'pkl')
 
         if self.config['mask_mode'] is 'exec':
-            omask = self.shadow_detecter.mask(img, semseg_map, self.labels)
+            omask = self.mask_creater.mask(img, semseg_map, self.labels)
         elif self.config['mask_mode'] is 'pass':
             with open(omask_path, mode='rb') as f:
                 omask = pickle.load(f)
         elif self.config['mask_mode'] is 'save':
-            omask = self.shadow_detecter.mask(img, semseg_map, self.labels)
+            omask = self.mask_creater.mask(img, semseg_map, self.labels)
             with open(omask_path, mode='wb') as f:
                 pickle.dump(omask, f)
 
         # visualization
-        self.debugger.matrix(omask, 'Object Mask', main=True)
-        self.debugger.img(omask, 'Object Mask', gray=True, main=True)
-        self.debugger.imsave(omask, self.fname + '_omask.' + self.fext, main=True)
+        self.debugger.matrix(omask, 'Object Mask')
+        self.debugger.img(omask, 'Object Mask', gray=True)
+        self.debugger.imsave(omask, self.fname + '_omask.' + self.fext)
 
         # visualize the mask overlayed image
         omask3c = np.stack([omask, np.zeros_like(omask), np.zeros_like(omask)], axis=-1)
         overlay = (img * 0.7 + omask3c * 0.3).astype(np.uint8)
-        self.debugger.matrix(overlay, 'Object Mask Overlayed Image', main=True)
-        self.debugger.img(overlay, 'Object Mask Overlayed Image', main=True)
-        self.debugger.imsave(overlay, self.fname + '_omask_overlayed.' + self.fext, main=True)
+        self.debugger.matrix(overlay, 'Object Mask Overlayed Image')
+        self.debugger.img(overlay, 'Object Mask Overlayed Image')
+        self.debugger.imsave(overlay, self.fname + '_omask_overlayed.' + self.fext)
 
         return omask
 
@@ -199,18 +205,24 @@ class GANonymizer:
             smask = np.zeros_like(mask)
 
         # visualization
-        self.debugger.matrix(smask, 'Shadow Mask', main=True)
-        self.debugger.img(smask, 'Shadow Mask', gray=True, main=True)
-        self.debugger.imsave(smask, self.fname + '_smask.' + self.fext, main=True)
+        self.debugger.matrix(smask, 'Shadow Mask')
+        self.debugger.img(smask, 'Shadow Mask', gray=True)
+        self.debugger.imsave(smask, self.fname + '_smask.' + self.fext)
 
         # visualize the mask overlayed image
         smask3c = np.stack([smask, np.zeros_like(smask), np.zeros_like(smask)], axis=-1)
         overlay = (img * 0.7 + smask3c * 0.3).astype(np.uint8)
-        self.debugger.matrix(overlay, 'Shadow Mask Overlayed Image', main=True)
-        self.debugger.img(overlay, 'Shadow Mask Overlayed Image', main=True)
-        self.debugger.imsave(overlay, self.fname + '_smask_overlayed.' + self.fext, main=True)
+        self.debugger.matrix(overlay, 'Shadow Mask Overlayed Image')
+        self.debugger.img(overlay, 'Shadow Mask Overlayed Image')
+        self.debugger.imsave(overlay, self.fname + '_smask_overlayed.' + self.fext)
 
         return smask
+
+
+    def _divide_mask(self, img, mask):
+        # pseudo mask division
+        print('===== Pseudo Mask Division =====')
+        self.mask_divider.divide(img, mask)
 
 
     def _inpaint(self, img, mask):
@@ -234,12 +246,12 @@ class GANonymizer:
                 pickle.dump(inpainted_edge, f)
 
         # visualization
-        self.debugger.matrix(inpainted_edge, 'Inpainted Edge', main=True)
-        self.debugger.img(inpainted_edge, 'Inpainted Edge', gray=True, main=True)
-        self.debugger.imsave(inpainted_edge, self.fname + '_inpainted_edge.' + self.fext, main=True)
-        self.debugger.matrix(inpainted, 'Inpainted Image', main=True)
-        self.debugger.img(inpainted, 'Inpainted Image', main=True)
-        self.debugger.imsave(inpainted, self.fname + '_inpainted.' + self.fext, main=True)
+        self.debugger.matrix(inpainted_edge, 'Inpainted Edge')
+        self.debugger.img(inpainted_edge, 'Inpainted Edge', gray=True)
+        self.debugger.imsave(inpainted_edge, self.fname + '_inpainted_edge.' + self.fext)
+        self.debugger.matrix(inpainted, 'Inpainted Image')
+        self.debugger.img(inpainted, 'Inpainted Image')
+        self.debugger.imsave(inpainted, self.fname + '_inpainted.' + self.fext)
 
         return inpainted, inpainted_edge
 

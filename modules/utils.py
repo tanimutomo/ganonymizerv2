@@ -26,16 +26,28 @@ def tensor_img_to_numpy(tensor):
     return array
 
 
+def detect_object(img):
+    num, label_map, stats, _ = cv2.connectedComponentsWithStats(img)
+    # stat is [tl_x, tl_y, w, h, area]
+    label_list = [i+1 for i in range(num - 1)]
+    return label_map, stats[1:], label_list
+
+
+def expand_mask(mask):
+    mask = mask.astype(np.uint8)
+    width = int((mask.shape[0] + mask.shape[1]) / 500)
+    contours, hierarchy = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    mask = cv2.drawContours(mask, contours, -1, 255, width) 
+    return mask.astype(np.uint8)
+
+
 class Debugger:
-    def __init__(self, main, debug, save, save_dir=None):
-        self.main = main
-        self.debug = debug
-        self.save = save
-        self.order = 0
+    def __init__(self, mode, save_dir=None):
+        self.mode = mode
         self.save_dir = save_dir
 
-    def img(self, img, comment, gray=False, main=False):
-        if self.debug or (self.main and main):
+    def img(self, img, comment, gray=False):
+        if self.mode is 'debug':
             print(comment)
             if type(img) is torch.Tensor and len(list(img.shape)) == 3:
                 img = tensor_img_to_numpy(img)
@@ -47,15 +59,15 @@ class Debugger:
             plt.show()
 
 
-    def param(self, param, comment, main=False):
-        if self.debug or (self.main and main):
+    def param(self, param, comment):
+        if self.mode is 'debug':
             print('-----', comment, '-----')
             print(param)
             print('-' * (len(comment) + 12))
 
 
-    def imsave(self, img, filename, main=False):
-        if (self.debug or (self.main and main)) and self.save:
+    def imsave(self, img, filename):
+        if self.mode is 'debug':
             print(img.shape)
             path = os.path.join(self.save_dir, filename)
             if type(img) is torch.Tensor:
@@ -69,8 +81,8 @@ class Debugger:
                 raise RuntimeError('The type of input image must be numpy.ndarray or torch.Tensor.')
 
 
-    def matrix(self, mat, comment, main=False):
-        if self.debug or (self.main and main):
+    def matrix(self, mat, comment):
+        if self.mode is 'debug':
             print('-----', comment, '-----')
             if type(mat) is torch.Tensor:
                 if 'float' in str(mat.dtype):
