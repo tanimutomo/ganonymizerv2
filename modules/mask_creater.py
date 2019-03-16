@@ -1,17 +1,17 @@
 import cv2
 import numpy as np
 
-from .utils import expand_mask, detect_object, Debugger
+from .utils import expand_mask, detect_object, Debugger, labels
 
 
 class MaskCreater:
     def __init__(self, config):
         self.config = config
         self.thresh = 3
-        self.debugger = Debugger(config['mask_mode'], save_dir=config['checkpoint'])
+        self.debugger = Debugger(config.mask_mode, save_dir=config.checkpoint)
 
     
-    def mask(self, img, segmap, labels):
+    def mask(self, img, segmap):
         # collect dynamic object's id
         dynamic_object_ids = []
         for label in labels:
@@ -30,7 +30,7 @@ class MaskCreater:
         return obj_mask.astype(np.uint8)
 
 
-    def separated_mask(self, img, segmap, crop_rate, labels):
+    def separated_mask(self, img, segmap, crop_rate):
         mask, _ = self.mask(img, segmap, labels)
         H, W = mask.shape
         label_map, stats, labels = detect_object(mask)

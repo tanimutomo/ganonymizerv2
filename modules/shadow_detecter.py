@@ -15,7 +15,7 @@ class ShadowDetecter:
     def __init__(self, config):
         self.config = config
         self.thresh = 3
-        self.debugger = Debugger(config['shadow_mode'], save_dir=config['checkpoint'])
+        self.debugger = Debugger(config.shadow_mode, save_dir=config.checkpoint)
 
 
     def detect(self, img, mask):
@@ -28,7 +28,7 @@ class ShadowDetecter:
             obj_mask = np.where(label_map==label, 255, 0).astype(np.uint8)
 
             # object area filtering
-            if stat[4] < img.shape[0] * img.shape[1] * self.config['obj_sml_thresh']:
+            if stat[4] < img.shape[0] * img.shape[1] * self.config.obj_sml_thresh:
                 continue
 
             # calcurate the median of object size
@@ -38,7 +38,7 @@ class ShadowDetecter:
             bbox = self._get_bottom_box(obj_mask, ver_m, hor_m, img.shape[1], img.shape[0])
 
             # object location filtering
-            if bbox[3] < img.shape[0] * self.config['obj_high_thresh']:
+            if bbox[3] < img.shape[0] * self.config.obj_high_thresh:
                 continue
 
             # Visualize Objec Mask
@@ -63,7 +63,7 @@ class ShadowDetecter:
             self.debugger.img(bot_img, 'bottom area image')
             
             # QuickShift Segmentation
-            segmap = self._superpixel(bot_img, self.config['superpixel'])
+            segmap = self._superpixel(bot_img, self.config.superpixel)
 
             # extract segment which is bottom of object
             obj_bot_mask = self._box_img(obj_mask, bbox)
@@ -179,11 +179,11 @@ class ShadowDetecter:
         self.debugger.matrix(unused_labels, 'unused labels')
 
         # calcurate the allowing color range
-        alw_range = min(int((most_color - scolor) / 2), self.config['alw_range_max'])
+        alw_range = min(int((most_color - scolor) / 2), self.config.alw_range_max)
         self.debugger.param(alw_range, 'Allowing Color Range')
 
         # find all shadow segments
-        for num in range(self.config['find_iteration']):
+        for num in range(self.config.find_iteration):
             add_ss_labels = []
             for slabel in ss_labels:
                 e_idx = np.where(s_edges==slabel)[0]
@@ -225,7 +225,7 @@ class ShadowDetecter:
                 box = [np.min(xs), np.min(ys), np.max(xs), np.max(ys)]
                 width, height = box[2] - box[0], box[3] - box[1]
 
-                if centroid[0] > H * self.config['shadow_high_thresh']:
+                if centroid[0] > H * self.config.shadow_high_thresh:
                     # create check pixels for checking whether a segment is under the object
                     hs = [int(centroid[0] * (2 / 3)), int(centroid[0] * (1 / 3)), 0]
                     ws = [
@@ -253,7 +253,7 @@ class ShadowDetecter:
                             ss_score += 1
 
                     self.debugger.matrix(ss_score, 'Shadow Segment Score')
-                    if ss_score > self.config['ss_score_thresh']:
+                    if ss_score > self.config.ss_score_thresh:
                         ss_labels.append(label)
 
         self.debugger.matrix(ss_labels, 'Shadow Segment Labels')
@@ -304,7 +304,7 @@ class ShadowDetecter:
         self.debugger.param(most_clst, 'most_clst:')
         self.debugger.param(most_clst_mean, 'most_clst_mean:')
         if counter[most_clst] < len(cluster) * 0.2: return None, None
-        if means[low_mean_clst] * self.config['sc_color_thresh'] > most_clst_mean: return None, None
+        if means[low_mean_clst] * self.config.sc_color_thresh > most_clst_mean: return None, None
         self.debugger.param(low_mean_clst, 'shadow_clst:')
 
         return low_mean_clst, most_clst_mean
@@ -335,7 +335,7 @@ class ShadowDetecter:
         self.debugger.matrix(gray, 'Mean of Segment Median Color')
         order = np.argsort(gray)
         gray, label = gray[order], label[order]
-        if self.config['shadow_mode'] == 'debug':
+        if self.config.shadow_mode == 'debug':
             plt.figure(figsize=(10, 10), dpi=200)
             plt.bar(np.arange(gray.shape[0]), gray,
                 tick_label=label, align='center')

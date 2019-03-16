@@ -5,10 +5,10 @@ from .utils import tensor_img_to_numpy, Debugger
 
 class SemanticSegmenter():
     def __init__(self, config, device):
-        self.network = config['semseg']
-        self.resnet = config['resnet']
+        self.network = config.semseg
+        self.resnet = config.resnet
         self.device = device
-        self.debugger = Debugger(config['semseg_mode'], save_dir=config['checkpoint'])
+        self.debugger = Debugger(config.semseg_mode, save_dir=config.checkpoint)
 
         if self.network == 'DeepLabV3':
             self.model = self._set_deeplabv3()

@@ -3,15 +3,17 @@ import cv2
 import torch
 
 from modules.ganonymizer import GANonymizer
-from modules.utils import Debugger, set_networks, labels
+from modules.utils import Config, Debugger
 
 
 def main(img, config):
+    config = Config(config)
+
     # setup environment
     device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
 
     # model prediction
-    model = GANonymizer(config, device, labels)
+    model = GANonymizer(config, device)
     model.predict(img)
 
 

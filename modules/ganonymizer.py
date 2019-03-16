@@ -10,15 +10,15 @@ from .mask_creater import MaskCreater
 from .shadow_detecter import ShadowDetecter
 from .mask_divider import MaskDivider
 from .inpainter import Inpainter
-from .utils import tensor_img_to_numpy, Debugger
+from .utils import Debugger
+
 
 class GANonymizer:
-    def __init__(self, config, device, labels):
+    def __init__(self, config, device):
         self.config = config
         self.devide = device
-        self.labels = labels
 
-        self.debugger = Debugger(config['main_mode'], save_dir=config['checkpoint'])
+        self.debugger = Debugger(config.main_mode, save_dir=config.checkpoint)
         self.to_tensor = ToTensor()
 
         self.semseger = SemanticSegmenter(config, device)
@@ -36,7 +36,7 @@ class GANonymizer:
         segmap = self._semseg(img)
 
         # use single entire mask (default)
-        if self.config['mask'] == 'entire':
+        if self.config.mask == 'entire':
 
             # get object mask and shadow mask and combine them
             omask = self._object_mask(img, segmap)
@@ -52,10 +52,10 @@ class GANonymizer:
             # save output image by PIL
             out = Image.fromarray(out)
             out.save('./data/exp/cityscapes_testset/{}_etr_out_shadow_{}.{}'.format(
-                self.fname, self.config['shadow_mode'], self.fext))
+                self.fname, self.config.shadow_mode, self.fext))
 
         # use separated mask for inpainting (this mode is failed)
-        elif self.config['mask'] == 'separate':
+        elif self.config.mask == 'separate':
             inputs = self._separated_mask(img, segmap)
             inpainteds = []
             for input in inputs:
@@ -69,7 +69,7 @@ class GANonymizer:
             self.debugger.img(out, 'Final Output')
             out = Image.fromarray(out)
             out.save('./data/exp/cityscapes_testset/{}_sep_out_resized_{}.{}'.format(
-                self.fname, self.config['resize_factor'], self.fext))
+                self.fname, self.config.resize_factor, self.fext))
 
 
     def _load_img(self, img_path):
@@ -77,8 +77,8 @@ class GANonymizer:
         print('===== Loading Image =====')
         self.fname, self.fext = img_path.split('/')[-1].split('.')
         img = Image.open(img_path)
-        img = img.resize((int(img.width / self.config['resize_factor']),
-            int(img.height / self.config['resize_factor'])))
+        img = img.resize((int(img.width / self.config.resize_factor),
+            int(img.height / self.config.resize_factor)))
         img = np.array(img)
 
         # visualization
@@ -92,13 +92,13 @@ class GANonymizer:
         # semantic segmentation
         print('===== Semantic Segmentation =====')
 
-        segmap_path = os.path.join(self.config['checkpoint'], self.fname + '_segmap.' + 'pkl')
-        if self.config['semseg_mode'] in ['exec', 'debug']:
+        segmap_path = os.path.join(self.config.checkpoint, self.fname + '_segmap.' + 'pkl')
+        if self.config.semseg_mode in ['exec', 'debug']:
             semseg_map = self.semseger.process(img)
-        elif self.config['semseg_mode'] is 'pass':
+        elif self.config.semseg_mode is 'pass':
             with open(segmap_path, mode='rb') as f:
                 semseg_map = pickle.load(f)
-        elif self.config['semseg_mode'] is 'save':
+        elif self.config.semseg_mode is 'save':
             semseg_map = self.semseger.process(img)
             with open(segmap_path, mode='wb') as f:
                 pickle.dump(semseg_map, f)
@@ -140,15 +140,15 @@ class GANonymizer:
     def _object_mask(self, img, semseg_map):
         # create mask image and image with mask
         print('===== Creating Mask Image =====')
-        omask_path = os.path.join(self.config['checkpoint'], self.fname + '_omask.' + 'pkl')
+        omask_path = os.path.join(self.config.checkpoint, self.fname + '_omask.' + 'pkl')
 
-        if self.config['mask_mode'] in ['exec', 'debug']:
-            omask = self.mask_creater.mask(img, semseg_map, self.labels)
-        elif self.config['mask_mode'] is 'pass':
+        if self.config.mask_mode in ['exec', 'debug']:
+            omask = self.mask_creater.mask(img, semseg_map)
+        elif self.config.mask_mode is 'pass':
             with open(omask_path, mode='rb') as f:
                 omask = pickle.load(f)
-        elif self.config['mask_mode'] is 'save':
-            omask = self.mask_creater.mask(img, semseg_map, self.labels)
+        elif self.config.mask_mode is 'save':
+            omask = self.mask_creater.mask(img, semseg_map)
             with open(omask_path, mode='wb') as f:
                 pickle.dump(omask, f)
 
@@ -170,17 +170,17 @@ class GANonymizer:
     def _separated_mask(self, img, semseg_map):
         # create mask image and image with mask
         print('===== Create separated inputs =====')
-        sep_inputs_path = os.path.join(self.config['checkpoint'], self.fname + '_sep_inputs.' + 'pkl')
+        sep_inputs_path = os.path.join(self.config.checkpoint, self.fname + '_sep_inputs.' + 'pkl')
 
-        if self.config['mask_mode'] in ['exec', 'debug']:
+        if self.config.mask_mode in ['exec', 'debug']:
             inputs = self.shadow_detecter.separated_mask(img, semseg_map, 
-                    self.config['crop_rate'], self.labels)
-        elif self.config['mask_mode'] is 'pass':
+                    self.config.crop_rate)
+        elif self.config.mask_mode is 'pass':
             with open(sep_inputs_path, mode='rb') as f:
                 inputs = pickle.load(f)
-        elif self.config['mask_mode'] is 'save':
+        elif self.config.mask_mode is 'save':
             inputs = self.shadow_detecter.separated_mask(img, semseg_map, 
-                    self.config['crop_rate'], self.labels)
+                    self.config.crop_rate)
             with open(sep_inputs_path, mode='wb') as f:
                 pickle.dump(inputs, f)
 
@@ -190,18 +190,18 @@ class GANonymizer:
     def _detect_shadow(self, img, mask):
         # shadow detection
         print('===== Shadow Detection =====')
-        smask_path = os.path.join(self.config['checkpoint'], self.fname + '_smask.' + 'pkl')
+        smask_path = os.path.join(self.config.checkpoint, self.fname + '_smask.' + 'pkl')
 
-        if self.config['shadow_mode'] in ['exec', 'debug']:
+        if self.config.shadow_mode in ['exec', 'debug']:
             smask = self.shadow_detecter.detect(img, mask)
-        elif self.config['shadow_mode'] is 'pass':
+        elif self.config.shadow_mode is 'pass':
             with open(smask_path, mode='rb') as f:
                 smask = pickle.load(f)
-        elif self.config['shadow_mode'] is 'save':
+        elif self.config.shadow_mode is 'save':
             smask = self.shadow_detecter.detect(img, mask)
             with open(smask_path, mode='wb') as f:
                 pickle.dump(smask, f)
-        elif self.config['shadow_mode'] is 'none':
+        elif self.config.shadow_mode is 'none':
             smask = np.zeros_like(mask)
 
         # visualization
@@ -228,17 +228,17 @@ class GANonymizer:
     def _inpaint(self, img, mask):
         # inpainter
         print('===== Image Inpainting and Edge Inpainting =====')
-        inpaint_path = os.path.join(self.config['checkpoint'], self.fname + '_inpaint.' + 'pkl')
-        inpaint_edge_path = os.path.join(self.config['checkpoint'], self.fname + '_inpaint_edge.' + 'pkl')
+        inpaint_path = os.path.join(self.config.checkpoint, self.fname + '_inpaint.' + 'pkl')
+        inpaint_edge_path = os.path.join(self.config.checkpoint, self.fname + '_inpaint_edge.' + 'pkl')
 
-        if self.config['inpaint_mode'] in ['exec', 'debug']:
+        if self.config.inpaint_mode in ['exec', 'debug']:
             inpainted, inpainted_edge = self.inpainter.inpaint(img, mask)
-        elif self.config['inpaint_mode'] is 'pass':
+        elif self.config.inpaint_mode is 'pass':
             with open(inpaint_path, mode='rb') as f:
                 inpainted = pickle.load(f)
             with open(inpaint_edge_path, mode='rb') as f:
                 inpainted_edge = pickle.load(f)
-        elif self.config['inpaint_mode'] is 'save':
+        elif self.config.inpaint_mode is 'save':
             inpainted, inpainted_edge = self.inpainter.inpaint(img, mask)
             with open(inpaint_path, mode='wb') as f:
                 pickle.dump(inpainted, f)
