@@ -6,19 +6,6 @@ from PIL import Image
 import matplotlib.pyplot as plt
 from collections import namedtuple
 
-def set_networks(DeepLabV3, resnet, device):
-    #Set up neural networks
-    weights = os.path.join(os.getcwd(),
-            'modules/deeplabv3/pretrained/model_13_2_2_2_epoch_580.pth')
-    resnet_root = os.path.join(os.getcwd(),
-        'modules/deeplabv3/pretrained/resnet')
-    semseger = DeepLabV3(resnet, resnet_root, device)
-    param = torch.load(weights, map_location=device)
-    semseger.load_state_dict(param)
-    semseger.eval() # (set in evaluation mode, this affects BatchNorm and dropout)
-
-    return semseger
-
 
 def tensor_img_to_numpy(tensor):
     array = tensor.numpy()
@@ -39,6 +26,17 @@ def expand_mask(mask):
     contours, hierarchy = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     mask = cv2.drawContours(mask, contours, -1, 255, width) 
     return mask.astype(np.uint8)
+
+
+class Config(dict):
+    def __init__(self, config):
+        self._conf = config
+ 
+    def __getattr__(self, name):
+        if self._conf.get(name) is not None:
+            return self._conf[name]
+
+        return None
 
 
 class Debugger:
