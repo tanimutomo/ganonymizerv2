@@ -4,7 +4,7 @@ from scipy import ndimage
 from collections import Counter
 from skimage.morphology import label
 from skimage.feature import peak_local_max
-from skimage.segmentation import random_walker
+from skimage.segmentation import random_walker, relabel_sequential
 
 from .utils import expand_mask, detect_object, Debugger
 
@@ -12,22 +12,46 @@ from .utils import expand_mask, detect_object, Debugger
 class MaskDivider:
     def __init__(self, config, inpainter):
         self.config = config
-        self.debugger = Debugger(config.divide_mode, save_dir=config.checkpoint)
+        self.debugger = Debugger('exec', save_dir=config.checkpoint)
+        self.debugger2 = Debugger('exec', save_dir=config.checkpoint)
+        self.debugger3 = Debugger(config.divide_mode, save_dir=config.checkpoint)
         self.inpainter = inpainter
     
 
     def divide(self, img, mask):
         # separate object in the mask using random walker algorithm
-        obj_labelmap = self._separete_objects(mask)
+        obj_labelmap = self._separate_objects(mask)
 
         # integrate separted small objects into big one
         obj_labelmap = self._remove_sml_obj(obj_labelmap)
+
+        # get large object
+        large_objects = self._large_object(obj_labelmap)
+
+
+    def _separate_objects(self, mask):
+        # separate object in the mask using random walker algorithm
+        # In obj_labelmap, -1 is background, 0 is none, object is from 1
+        mask = np.where(mask > 0, 1, 0).astype(np.bool)
+
+        ksize = int((mask.shape[0] + mask.shape[1]) / 30)
+        distance = ndimage.distance_transform_edt(mask)
+        local_maxi = peak_local_max(distance, indices=False, 
+                footprint=np.ones((ksize, ksize)), labels=mask)
+        markers = label(local_maxi)
+        markers[~mask] = -1
+        labelmap = random_walker(mask, markers)
+        
+        self.debugger.img(labelmap, 'labelmap', gray=True)
+
+        return labelmap
 
 
     def _remove_sml_obj(self, obj_labelmap):
         # integrate separted small objects into big one
         max_label = np.max(obj_labelmap)
 
+        removed_labels = []
         # start from object label 1 (-1 and 0 is not object)
         for label in range(1, max_label):
             # create each object mask
@@ -66,23 +90,58 @@ class MaskDivider:
 
             # integrate this label object into most surrounding label
             obj_labelmap = np.where(obj_labelmap == label, most_sur_label, obj_labelmap)
+            removed_labels.append(label)
+
+        # make label order sequential
+        for label in removed_labels:
+            obj_labelmap = np.where(obj_labelmap > label, obj_labelmap - 1, obj_labelmap)
 
         self.debugger.img(obj_labelmap, 'output of object label map')
+        return obj_labelmap
 
 
-    def _separate_objects(self, mask):
-        # separate object in the mask using random walker algorithm
-        # In obj_labelmap, -1 is background, 0 is none, object is from 1
-        mask = np.where(mask > 0, 1, 0).astype(np.bool)
+    def _large_object(self, labelmap):
+        # change background label from -1 to 0
+        labelmap = np.where(labelmap < 0, 0, labelmap)
+        larges = []
+        for label in range(1, np.max(labelmap)):
+            # get object mask
+            objmask = np.where(labelmap == label, 1, 0)
+            self.debugger2.img(objmask, 'objmask', gray=True)
 
-        ksize = int((mask.shape[0] + mask.shape[1]) / 30)
-        distance = ndimage.distance_transform_edt(mask)
-        local_maxi = peak_local_max(distance, indices=False, 
-                footprint=np.ones((ksize, ksize)), labels=mask)
-        markers = label(local_maxi)
-        markers[~mask] = -1
-        labelmap = random_walker(mask, markers)
-        
-        self.debugger.img(labelmap, 'labelmap', gray=True)
+            # calcurate object area
+            area = np.sum(objmask)
+            self.debugger2.param(area, 'area')
 
-        return labelmap
+            # filtering by area
+            if area < labelmap.shape[0] * labelmap.shape[1] * self.config.obj_sml_thresh: continue
+
+            # calcurate object box and boxarea
+            ys, xs = np.where(objmask == 1)
+            box = [np.min(xs), np.min(ys), np.max(xs), np.max(ys)]
+            self.debugger2.param(box, 'box')
+            width, height = box[3] - box[1], box[2] - box[0]
+            self.debugger2.param(width, 'width')
+            self.debugger2.param(height, 'height')
+
+            # filtering by box width, height
+            if width < self.config.obj_wh_thresh or height < self.config.obj_wh_thresh: continue
+
+            # calcurate the density
+            density = area / (width * height)
+            self.debugger2.param(density, 'density')
+
+            # filtering by density
+            if density < self.config.obj_density_thresh: continue
+
+            larges.append({
+                    'mask': objmask,
+                    'box': box,
+                    'width': width,
+                    'height': height
+                    })
+
+        self.debugger2.param(larges, 'larges')
+        return larges
+
+
