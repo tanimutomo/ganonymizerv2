@@ -15,8 +15,8 @@ class Inpainter():
 
 
     def inpaint(self, img, mask):
-        output, out_edge = self.model.inpaint(img, mask)
-        return output, out_edge
+        output, out_edge, edge = self.model.inpaint(img, mask)
+        return output, out_edge, edge
 
 
     def _set_edge_connect(self):
