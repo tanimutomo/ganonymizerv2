@@ -232,6 +232,7 @@ class GANonymizer:
         print('===== Image Inpainting and Edge Inpainting =====')
         inpaint_path = os.path.join(self.config.checkpoint, self.fname + '_inpaint.' + 'pkl')
         inpaint_edge_path = os.path.join(self.config.checkpoint, self.fname + '_inpaint_edge.' + 'pkl')
+        edge_path = os.path.join(self.config.checkpoint, self.fname + '_edge.' + 'pkl')
 
         if self.config.inpaint_mode in ['exec', 'debug']:
             inpainted, inpainted_edge, edge = self.inpainter.inpaint(img, mask)
@@ -240,12 +241,16 @@ class GANonymizer:
                 inpainted = pickle.load(f)
             with open(inpaint_edge_path, mode='rb') as f:
                 inpainted_edge = pickle.load(f)
+            with open(edge_path, mode='rb') as f:
+                edge = pickle.load(f)
         elif self.config.inpaint_mode is 'save':
-            inpainted, inpainted_edge = self.inpainter.inpaint(img, mask)
+            inpainted, inpainted_edge, edge = self.inpainter.inpaint(img, mask)
             with open(inpaint_path, mode='wb') as f:
                 pickle.dump(inpainted, f)
             with open(inpaint_edge_path, mode='wb') as f:
                 pickle.dump(inpainted_edge, f)
+            with open(edge_path, mode='rb') as f:
+                pickle.dump(edge, f)
 
         # visualization
         self.debugger.matrix(edge, 'Edge')
