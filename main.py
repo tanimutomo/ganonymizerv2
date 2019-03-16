@@ -29,8 +29,8 @@ if __name__ == '__main__':
             # mode (choose in ['pass', 'exec', 'debug', 'save'])
             'main_mode': 'exec',
             'semseg_mode': 'pass',
-            'mask_mode': 'exec',
-            'shadow_mode': 'exec',
+            'mask_mode': 'pass',
+            'shadow_mode': 'pass',
             'divide_mode': 'exec',
             'inpaint_mode': 'pass',
 
@@ -52,6 +52,10 @@ if __name__ == '__main__':
             'find_iteration': 3,
             'ss_score_thresh': 4,
             'sc_color_thresh': 1.5,
+
+            # pseudo mask division
+            'obj_wh_thresh': 120,
+            'obj_density_thresh': 0.6,
 
             # inpaint
             'inpaint': 'EdgeConnect',
