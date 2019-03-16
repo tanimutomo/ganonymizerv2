@@ -47,12 +47,14 @@ class GANonymizer:
             self._divide_mask(img, mask)
 
             # image and edge inpainting
+            img = cv2.resize(img, (int(img.shape[1] / 8), int(img.shape[0] / 8)))
+            mask = cv2.resize(mask, (int(mask.shape[1] / 8), int(mask.shape[0] / 8)))
             out, _ = self._inpaint(img, mask)
 
             # save output image by PIL
             out = Image.fromarray(out)
-            out.save('./data/exp/cityscapes_testset/{}_etr_out_shadow_{}.{}'.format(
-                self.fname, self.config.shadow_mode, self.fext))
+            out.save('./data/exp/cityscapes_testset/{}_out.{}'.format(
+                self.fname, self.fext))
 
         # use separated mask for inpainting (this mode is failed)
         elif self.config.mask == 'separate':
