@@ -46,6 +46,7 @@ class Debugger:
 
     def img(self, img, comment, gray=False):
         if self.mode is 'debug':
+            print('-'*10, comment, '-'*10)
             self.matrix(img, comment)
             if type(img) is torch.Tensor and len(list(img.shape)) == 3:
                 img = tensor_img_to_numpy(img)
@@ -55,7 +56,7 @@ class Debugger:
             if gray:
                 plt.gray()
             plt.show()
-            print('-' * (len(comment) + 12))
+            print('-' * (len(comment) + 22))
 
 
     def param(self, param, comment):
