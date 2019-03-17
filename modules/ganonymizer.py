@@ -51,8 +51,10 @@ class GANonymizer:
 
             # save output image by PIL
             out = Image.fromarray(out)
+            shadow = 'off' if self.config.shadow_mode is 'none' else 'on'
+            pmd = 'off' if self.config.divide_mode is 'none' else 'on'
             out.save('./data/exp/cityscapes_testset/{}_out_shadow_{}_pmd_{}.{}'.format(
-                self.fname, self.config.shadow_mode, self.config.divide_mode, self.fext))
+                self.fname, shadow, pmd, self.fext))
 
         # use separated mask for inpainting (this mode is failed)
         elif self.config.mask == 'separate':
