@@ -89,28 +89,6 @@ class GANonymizer:
         return img
 
 
-    def _semseg(self, img):
-        # semantic segmentation
-        print('===== Semantic Segmentation =====')
-
-        segmap_path = os.path.join(self.config.checkpoint, self.fname + '_segmap.' + 'pkl')
-        if self.config.semseg_mode in ['exec', 'debug']:
-            semseg_map = self.semseger.process(img)
-        elif self.config.semseg_mode is 'pass':
-            with open(segmap_path, mode='rb') as f:
-                semseg_map = pickle.load(f)
-        elif self.config.semseg_mode is 'save':
-            semseg_map = self.semseger.process(img)
-            with open(segmap_path, mode='wb') as f:
-                pickle.dump(semseg_map, f)
-
-        # visualization
-        self.debugger.img(semseg_map, 'Semantic Segmentation Map Prediction by DeepLabV3')
-        self.debugger.imsave(semseg_map, self.fname + '_semsegmap.' + self.fext)
-
-        return semseg_map
-
-    
     def _combine_masks(self, img, omask, smask):
         # check omask and smak shape
         assert omask.shape == smask.shape
@@ -135,24 +113,20 @@ class GANonymizer:
         return mask
 
 
+    def _semseg(self, img):
+        # semantic segmentation
+        print('===== Semantic Segmentation =====')
+        semseg_map = self._exec_module(self.config.semseg_mode, 'segmap',
+                self.semseger.process, img)
+
+        return semseg_map
+
+    
     def _object_mask(self, img, semseg_map):
         # create mask image and image with mask
         print('===== Creating Mask Image =====')
-        omask_path = os.path.join(self.config.checkpoint, self.fname + '_omask.' + 'pkl')
-
-        if self.config.mask_mode in ['exec', 'debug']:
-            omask = self.mask_creater.mask(img, semseg_map)
-        elif self.config.mask_mode is 'pass':
-            with open(omask_path, mode='rb') as f:
-                omask = pickle.load(f)
-        elif self.config.mask_mode is 'save':
-            omask = self.mask_creater.mask(img, semseg_map)
-            with open(omask_path, mode='wb') as f:
-                pickle.dump(omask, f)
-
-        # visualization
-        self.debugger.img(omask, 'Object Mask', gray=True)
-        self.debugger.imsave(omask, self.fname + '_omask.' + self.fext)
+        omask = self._exec_module(self.config.mask_mode, 'omask',
+                self.mask_creater.mask, img, semseg_map)
 
         # visualize the mask overlayed image
         omask3c = np.stack([omask, np.zeros_like(omask), np.zeros_like(omask)], axis=-1)
@@ -163,46 +137,14 @@ class GANonymizer:
         return omask
 
 
-    def _separated_mask(self, img, semseg_map):
-        # create mask image and image with mask
-        print('===== Create separated inputs =====')
-        sep_inputs_path = os.path.join(self.config.checkpoint, self.fname + '_sep_inputs.' + 'pkl')
-
-        if self.config.mask_mode in ['exec', 'debug']:
-            inputs = self.shadow_detecter.separated_mask(img, semseg_map, 
-                    self.config.crop_rate)
-        elif self.config.mask_mode is 'pass':
-            with open(sep_inputs_path, mode='rb') as f:
-                inputs = pickle.load(f)
-        elif self.config.mask_mode is 'save':
-            inputs = self.shadow_detecter.separated_mask(img, semseg_map, 
-                    self.config.crop_rate)
-            with open(sep_inputs_path, mode='wb') as f:
-                pickle.dump(inputs, f)
-
-        return inputs
-
-
     def _detect_shadow(self, img, mask):
         # shadow detection
         print('===== Shadow Detection =====')
-        smask_path = os.path.join(self.config.checkpoint, self.fname + '_smask.' + 'pkl')
-
-        if self.config.shadow_mode in ['exec', 'debug']:
-            smask = self.shadow_detecter.detect(img, mask)
-        elif self.config.shadow_mode is 'pass':
-            with open(smask_path, mode='rb') as f:
-                smask = pickle.load(f)
-        elif self.config.shadow_mode is 'save':
-            smask = self.shadow_detecter.detect(img, mask)
-            with open(smask_path, mode='wb') as f:
-                pickle.dump(smask, f)
-        elif self.config.shadow_mode is 'none':
-            smask = np.zeros_like(mask)
-
-        # visualization
-        self.debugger.img(smask, 'Shadow Mask', gray=True)
-        self.debugger.imsave(smask, self.fname + '_smask.' + self.fext)
+        if self.config.shadow_mode is 'none':
+            smask = np.zeros_like(mask).astype(np.uint8)
+        else:
+            smask = self._exec_module(self.config.shadow_mode, 'smask',
+                    self.shadow_detecter.detect, img, mask)
 
         # visualize the mask overlayed image
         smask3c = np.stack([smask, np.zeros_like(smask), np.zeros_like(smask)], axis=-1)
@@ -216,33 +158,12 @@ class GANonymizer:
     def _divide_mask(self, img, mask):
         # pseudo mask division
         print('===== Pseudo Mask Division =====')
-        divimg, divmask = self.mask_divider.divide(img, mask, self.fname, self.fext)
-
-        divimg_path = os.path.join(self.config.checkpoint, self.fname + '_divimg.' + 'pkl')
-        divmask_path = os.path.join(self.config.checkpoint, self.fname + '_divmask.' + 'pkl')
-
-        if self.config.divide_mode in ['exec', 'debug']:
-            divimg, divmask = self.mask_divider.divide(img, mask, self.fname, self.fext)
-        elif self.config.divide_mode is 'pass':
-            with open(divimg_path, mode='rb') as f:
-                divimg = pickle.load(f)
-            with open(divmask_path, mode='rb') as f:
-                divmask = pickle.load(f)
-        elif self.config.divide_mode is 'save':
-            divimg, divmask = self.mask_divider.divide(img, mask, self.fname, self.fext)
-            with open(divimg_path, mode='wb') as f:
-                pickle.dump(divimg, f)
-            with open(divmask_path, mode='wb') as f:
-                pickle.dump(divmask, f)
-        elif self.config.divide_mode is 'none':
+        if self.config.divide_mode is 'none':
             divimg = img
             divmask = mask
-
-        # visualization
-        self.debugger.img(divimg, 'Divided Image')
-        self.debugger.imsave(divimg, self.fname + '_divimg.' + self.fext)
-        self.debugger.img(divmask, 'Divided Mask', gray=True)
-        self.debugger.imsave(divmask, self.fname + '_divmask.' + self.fext)
+        else:
+            divimg, divmask = self._exec_module(self.config.divide_mode, ['divimg', 'divmask'],
+                    self.mask_divider.divide, img, mask, self.fname, self.fext)
 
         return divimg, divmask
 
@@ -250,37 +171,19 @@ class GANonymizer:
     def _inpaint(self, img, mask):
         # inpainter
         print('===== Image Inpainting and Edge Inpainting =====')
-        inpaint_path = os.path.join(self.config.checkpoint, self.fname + '_inpaint.' + 'pkl')
-        inpaint_edge_path = os.path.join(self.config.checkpoint, self.fname + '_inpaint_edge.' + 'pkl')
-        edge_path = os.path.join(self.config.checkpoint, self.fname + '_edge.' + 'pkl')
+        inpainted, inpainted_edge, edge = self._exec_module(self.config.divide_mode,
+                ['inpaint', 'inpaint_edge', 'edge'], self.inpainter.inpaint, img, mask)
 
-        if self.config.inpaint_mode in ['exec', 'debug']:
-            inpainted, inpainted_edge, edge = self.inpainter.inpaint(img, mask)
-        elif self.config.inpaint_mode is 'pass':
-            with open(inpaint_path, mode='rb') as f:
-                inpainted = pickle.load(f)
-            with open(inpaint_edge_path, mode='rb') as f:
-                inpainted_edge = pickle.load(f)
-            with open(edge_path, mode='rb') as f:
-                edge = pickle.load(f)
-        elif self.config.inpaint_mode is 'save':
-            inpainted, inpainted_edge, edge = self.inpainter.inpaint(img, mask)
-            with open(inpaint_path, mode='wb') as f:
-                pickle.dump(inpainted, f)
-            with open(inpaint_edge_path, mode='wb') as f:
-                pickle.dump(inpainted_edge, f)
-            with open(edge_path, mode='wb') as f:
-                pickle.dump(edge, f)
+        return inpainted
 
-        # visualization
-        self.debugger.img(edge, 'Edge', gray=True)
-        self.debugger.imsave(edge, self.fname + '_edge.' + self.fext)
-        self.debugger.img(inpainted_edge, 'Inpainted Edge', gray=True)
-        self.debugger.imsave(inpainted_edge, self.fname + '_inpainted_edge.' + self.fext)
-        self.debugger.img(inpainted, 'Inpainted Image')
-        self.debugger.imsave(inpainted, self.fname + '_inpainted.' + self.fext)
 
-        return inpainted, inpainted_edge
+    def _separated_mask(self, img, semseg_map):
+        # create mask image and image with mask
+        print('===== Create separated inputs =====')
+        inputs = self._exec_module(self.config.mask_mode, 'sep_inputs',
+                self.mask_creater.separated_mask, img, semseg_map)
+
+        return inputs
 
 
     def _integrate_outputs(self, img, inputs, outputs):
@@ -304,4 +207,50 @@ class GANonymizer:
 
         return img
 
+
+    def _exec_module(self, mode, names, func, *args):
+        if type(names) == str:
+            path = os.path.join(self.config.checkpoint, self.fname + '_{}.'.format(names) + 'pkl')
+        else:
+            paths = []
+            for name in names:
+                paths.append(os.path.join(self.config.checkpoint,
+                    self.fname + '_{}.'.format(name) + 'pkl'))
+
+        if mode in ['exec', 'debug']:
+            if type(names) == str:
+                result = func(*args)
+            else:
+                results = list(func(*args))
+        elif mode is 'pass':
+            if type(names) == str:
+                with open(path, mode='rb') as f:
+                    result = pickle.load(f)
+            else:
+                results = []
+                for path in paths:
+                    with open(path, mode='rb') as f:
+                        results.append(pickle.load(f))
+        elif mode is 'save':
+            if type(names) == str:
+                result = func(*args)
+                with open(path, mode='wb') as f:
+                    pickle.dump(result, f)
+            else:
+                results = list(func(*args))
+                for res, path in zip(results, paths):
+                    with open(path, mode='wb') as f:
+                        pickle.dump(res, f)
+
+        # visualization
+        if type(names) == str:
+            self.debugger.img(result, names)
+            self.debugger.imsave(result, self.fname + '_{}.'.format(names) + self.fext)
+            return result
+
+        else:
+            for res, name in zip(results, names):
+                self.debugger.img(res, name)
+                self.debugger.imsave(res, self.fname + '_{}.'.format(name) + self.fext)
+            return results
 
