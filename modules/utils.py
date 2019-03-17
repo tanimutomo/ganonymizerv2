@@ -6,19 +6,6 @@ from PIL import Image
 import matplotlib.pyplot as plt
 from collections import namedtuple
 
-def set_networks(DeepLabV3, resnet, device):
-    #Set up neural networks
-    weights = os.path.join(os.getcwd(),
-            'modules/deeplabv3/pretrained/model_13_2_2_2_epoch_580.pth')
-    resnet_root = os.path.join(os.getcwd(),
-        'modules/deeplabv3/pretrained/resnet')
-    semseger = DeepLabV3(resnet, resnet_root, device)
-    param = torch.load(weights, map_location=device)
-    semseger.load_state_dict(param)
-    semseger.eval() # (set in evaluation mode, this affects BatchNorm and dropout)
-
-    return semseger
-
 
 def tensor_img_to_numpy(tensor):
     array = tensor.numpy()
@@ -41,6 +28,17 @@ def expand_mask(mask):
     return mask.astype(np.uint8)
 
 
+class Config(dict):
+    def __init__(self, config):
+        self._conf = config
+ 
+    def __getattr__(self, name):
+        if self._conf.get(name) is not None:
+            return self._conf[name]
+
+        return None
+
+
 class Debugger:
     def __init__(self, mode, save_dir=None):
         self.mode = mode
@@ -48,7 +46,8 @@ class Debugger:
 
     def img(self, img, comment, gray=False):
         if self.mode is 'debug':
-            print(comment)
+            print('-'*10, comment, '-'*10)
+            self.matrix(img, comment)
             if type(img) is torch.Tensor and len(list(img.shape)) == 3:
                 img = tensor_img_to_numpy(img)
                 
@@ -57,6 +56,7 @@ class Debugger:
             if gray:
                 plt.gray()
             plt.show()
+            print('-' * (len(comment) + 22))
 
 
     def param(self, param, comment):

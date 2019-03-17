@@ -3,20 +3,30 @@ import cv2
 import torch
 
 from modules.ganonymizer import GANonymizer
-from modules.utils import Debugger, set_networks, labels
+from modules.utils import Config, Debugger
 
 
-def main(img, config):
+def main(impath, config):
+    config = Config(config)
+
     # setup environment
     device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
 
+    # define the model
+    model = GANonymizer(config, device)
+
     # model prediction
-    model = GANonymizer(config, device, labels)
-    model.predict(img)
+    if type(impath) == str:
+        model.predict(impath)
+    elif type(impath) == list:
+        for path in impath:
+            model.predict(path)
+    else:
+        raise RuntimeError('impath must be type of str or list object.')
 
 
 if __name__ == '__main__':
-    img = os.path.join(os.getcwd(), 'data/exp/cityscapes_testset/ex_01.png')
+    impath = os.path.join(os.getcwd(), 'data/exp/cityscapes_testset/ex_01.png')
     config = {
             # execution setting
             'checkpoint': 'data/exp/cityscapes_testset',
@@ -24,11 +34,11 @@ if __name__ == '__main__':
             # resize
             'resize_factor': 1,
         
-            # mode (choose in ['pass', 'exec', 'debug', 'save'])
+            # mode (choose in ['pass', 'save', 'exec', 'debug', 'none'])
             'main_mode': 'exec',
             'semseg_mode': 'pass',
-            'mask_mode': 'exec',
-            'shadow_mode': 'exec',
+            'mask_mode': 'pass',
+            'shadow_mode': 'pass',
             'divide_mode': 'exec',
             'inpaint_mode': 'pass',
 
@@ -42,7 +52,7 @@ if __name__ == '__main__':
             'crop_rate': 0.5,
 
             # shadow detection
-            'obj_sml_thresh': 1e-3,
+            'obj_sml_thresh': 1e-3, # this param is also used in the pmd
             'obj_high_thresh': 0.2,
             'superpixel': 'quickshift',
             'shadow_high_thresh': 0.01,
@@ -51,11 +61,15 @@ if __name__ == '__main__':
             'ss_score_thresh': 4,
             'sc_color_thresh': 1.5,
 
+            # pseudo mask division
+            'obj_wh_thresh': 120,
+            'obj_density_thresh': 0.6,
+
             # inpaint
             'inpaint': 'EdgeConnect',
             'inpaint_ckpt': 'modules/edge_connect/checkpoints',
-            'sigma': 2
+            'sigma': 2 # for canny edge detection
             }
     
-    main(img, config)
+    main(impath, config)
 

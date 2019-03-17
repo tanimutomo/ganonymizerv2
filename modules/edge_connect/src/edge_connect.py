@@ -58,10 +58,11 @@ class SimpleEdgeConnect():
         output = self.inpaint_model(img, edge, mask)
         output_merged = (output * mask) + (img * (1 - mask))
 
+        edge = self._postprocess(edge)
         out_edge = self._postprocess(out_edge)
         output = self._postprocess(output_merged)
 
-        return output, out_edge
+        return output, out_edge, edge
 
 
     def _get_edge(self, gray, mask):
