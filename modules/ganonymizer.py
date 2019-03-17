@@ -44,12 +44,10 @@ class GANonymizer:
             mask = self._combine_masks(img, omask, smask)
 
             # Psuedo Mask Division
-            self._divide_mask(img, mask)
+            divimg, divmask = self._divide_mask(img, mask)
 
             # image and edge inpainting
-            img = cv2.resize(img, (int(img.shape[1] / 8), int(img.shape[0] / 8)))
-            mask = cv2.resize(mask, (int(mask.shape[1] / 8), int(mask.shape[0] / 8)))
-            out, _ = self._inpaint(img, mask)
+            out, _ = self._inpaint(divimg, divmask)
 
             # save output image by PIL
             out = Image.fromarray(out)
@@ -224,7 +222,8 @@ class GANonymizer:
     def _divide_mask(self, img, mask):
         # pseudo mask division
         print('===== Pseudo Mask Division =====')
-        self.mask_divider.divide(img, mask)
+        divimg, divmask = self.mask_divider.divide(img, mask, self.fname, self.fext)
+        return divimg, divmask
 
 
     def _inpaint(self, img, mask):
@@ -249,7 +248,7 @@ class GANonymizer:
                 pickle.dump(inpainted, f)
             with open(inpaint_edge_path, mode='wb') as f:
                 pickle.dump(inpainted_edge, f)
-            with open(edge_path, mode='rb') as f:
+            with open(edge_path, mode='wb') as f:
                 pickle.dump(edge, f)
 
         # visualization
