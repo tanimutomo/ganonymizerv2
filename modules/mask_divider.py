@@ -15,9 +15,9 @@ class MaskDivider:
     def __init__(self, config, inpainter):
         self.config = config
         self.debugger = Debugger('exec', save_dir=config.checkpoint)
-        self.debugger2 = Debugger('exec', save_dir=config.checkpoint)
-        self.debugger3 = Debugger('exec', save_dir=config.checkpoint)
-        self.debugger4 = Debugger('exec', save_dir=config.checkpoint)
+        self.debugger2 = Debugger('debug', save_dir=config.checkpoint)
+        self.debugger3 = Debugger('debug', save_dir=config.checkpoint)
+        self.debugger4 = Debugger('debug', save_dir=config.checkpoint)
         self.inpainter = inpainter
     
 
@@ -29,13 +29,13 @@ class MaskDivider:
         obj_labelmap = self._remove_sml_obj(obj_labelmap)
 
         # get large object
-        large_objects = self._large_object(obj_labelmap)
+        objects = self._classify_object(obj_labelmap)
 
         # apply inpainting to resized image for each large object
-        large_objects = self._get_sml_inpainted(large_objects, img, mask, fname, fext)
+        objects = self._get_sml_inpainted(objects, img, mask, fname, fext)
 
         # calcurate the lattice position and create new inputs
-        new_img, new_mask = self._get_divided_inputs(large_objects, img, mask)
+        new_img, new_mask = self._divide_inputs(objects, img, mask)
 
         return new_img, new_mask
 
@@ -110,10 +110,10 @@ class MaskDivider:
         return obj_labelmap
 
 
-    def _large_object(self, labelmap):
+    def _classify_object(self, labelmap):
         # change background label from -1 to 0
         labelmap = np.where(labelmap < 0, 0, labelmap)
-        larges = []
+        objects = []
         for label in range(1, np.max(labelmap) + 1):
             # get object mask
             objmask = np.where(labelmap == label, 1, 0)
@@ -124,7 +124,9 @@ class MaskDivider:
             self.debugger2.param(area, 'area')
 
             # filtering by area
-            if area < labelmap.shape[0] * labelmap.shape[1] * self.config.obj_sml_thresh: continue
+            if area < labelmap.shape[0] * labelmap.shape[1] * self.config.obj_sml_thresh:
+                objects.append({'large': False, 'mask': objmask})
+                continue
 
             # calcurate object box and boxarea
             ys, xs = np.where(objmask == 1)
@@ -135,31 +137,39 @@ class MaskDivider:
             self.debugger2.param(height, 'height')
 
             # filtering by box width, height
-            if width < self.config.obj_wh_thresh or height < self.config.obj_wh_thresh: continue
+            if width < self.config.obj_wh_thresh or height < self.config.obj_wh_thresh:
+                objects.append({'large': False, 'mask': objmask})
+                continue
 
             # calcurate the density
             density = area / (width * height)
             self.debugger2.param(density, 'density')
 
             # filtering by density
-            if density < self.config.obj_density_thresh: continue
+            if density < self.config.obj_density_thresh:
+                objects.append({'large': False, 'mask': objmask})
+            else:
+                objects.append({
+                        'large': True,
+                        'mask': objmask,
+                        'box': box,
+                        'width': width,
+                        'height': height
+                        })
 
-            larges.append({
-                    'mask': objmask,
-                    'box': box,
-                    'width': width,
-                    'height': height
-                    })
-
-        self.debugger2.param(larges, 'larges')
-        return larges
+        self.debugger2.param(objects, 'objects')
+        return objects
 
 
-    def _get_sml_inpainted(self, large_objects, img, mask, fname, fext):
+    def _get_sml_inpainted(self, objects, img, mask, fname, fext):
         H, W = img.shape[0], img.shape[1]
 
         # apply inpaint each resized image
-        for idx, obj in enumerate(large_objects):
+        for idx, obj in enumerate(objects):
+            # don't apply to small object
+            if not obj['large']: continue
+
+            # copy original image and mask for resizing 
             resimg, resmask = img.copy(), mask.copy()
 
             # calcurate new height and width
@@ -214,49 +224,56 @@ class MaskDivider:
             obj['inpainted_edge'] = inpainted_edge
             obj['edge'] = edge
 
-        self.debugger3.param(large_objects, 'large objects')
-        return large_objects
+        self.debugger3.param(objects, 'large objects')
+        return objects
 
 
-    def _get_divided_inputs(self, large_objects, img, mask):
-        for idx, obj in enumerate(large_objects):
-            self.debugger4.img(obj['mask'], 'check object')
-            x, y, _, _ = obj['box']
-            h, w = obj['height'], obj['width']
-            self.debugger4.param(h, 'height')
-            self.debugger4.param(w, 'width')
+    def _divide_inputs(self, objects, img, mask):
+        for idx, obj in enumerate(objects):
+            # don't apply to small object
+            if obj['large']:
+                self.debugger4.img(obj['mask'], 'check object')
+                x, y, _, _ = obj['box']
+                h, w = obj['height'], obj['width']
+                self.debugger4.param(h, 'height')
+                self.debugger4.param(w, 'width')
 
-            # create lattice mask image
-            lattice = np.zeros_like(obj['mask']).astype(np.uint8)
-            vline_w, hline_w = int(w / 16), int(h / 16)
-            self.debugger4.param(vline_w, 'vline width')
-            self.debugger4.param(hline_w, 'hline width')
-            # draw vertical line
-            lattice = cv2.line(lattice,
-                    (x + int(w * (5/16)), y + int(h * (1/8))),
-                    (x + int(w * (5/16)), y + int(h * (7/8))),
-                    1, vline_w)
-            lattice = cv2.line(lattice,
-                    (x + int(w * (11/16)), y + int(h * (1/8))),
-                    (x + int(w * (11/16)), y + int(h * (7/8))),
-                    1, vline_w)
-            # draw horizontal line
-            lattice = cv2.line(lattice,
-                    (x + int(w * (1/8)), y + int(h * (5/16))),
-                    (x + int(w * (7/8)), y + int(h * (5/16))),
-                    1, hline_w)
-            lattice = cv2.line(lattice,
-                    (x + int(w * (1/8)), y + int(h * (11/16))),
-                    (x + int(w * (7/8)), y + int(h * (11/16))),
-                    1, hline_w)
+                # create lattice mask image
+                lattice = np.zeros_like(obj['mask']).astype(np.uint8)
+                vline_w, hline_w = int(w / 16), int(h / 16)
+                self.debugger4.param(vline_w, 'vline width')
+                self.debugger4.param(hline_w, 'hline width')
+                # draw vertical line
+                lattice = cv2.line(lattice,
+                        (x + int(w * (5/16)), y + int(h * (1/8))),
+                        (x + int(w * (5/16)), y + int(h * (7/8))),
+                        1, vline_w)
+                lattice = cv2.line(lattice,
+                        (x + int(w * (11/16)), y + int(h * (1/8))),
+                        (x + int(w * (11/16)), y + int(h * (7/8))),
+                        1, vline_w)
+                # draw horizontal line
+                lattice = cv2.line(lattice,
+                        (x + int(w * (1/8)), y + int(h * (5/16))),
+                        (x + int(w * (7/8)), y + int(h * (5/16))),
+                        1, hline_w)
+                lattice = cv2.line(lattice,
+                        (x + int(w * (1/8)), y + int(h * (11/16))),
+                        (x + int(w * (7/8)), y + int(h * (11/16))),
+                        1, hline_w)
 
-            self.debugger4.img(lattice, 'lattice image')
-            lattice3c = np.stack([lattice for _ in range(3)], axis=-1).astype(np.uint8)
-            # insert inpainted image to lattice part in black image
-            imglat = np.where(lattice3c == 1, obj['inpainted'], lattice3c)
+                self.debugger4.img(lattice, 'lattice image')
+                lattice3c = np.stack([lattice for _ in range(3)], axis=-1).astype(np.uint8)
+                # insert inpainted image to lattice part in black image
+                imglat = np.where(lattice3c == 1, obj['inpainted'], lattice3c)
+                # insert this object mask image to not lattice part in black image
+                masklat = np.where(lattice == 1, 0, obj['mask'])
+
+            else:
+                imglat = np.zeros_like(img)
+                masklat = obj['mask']
+
             self.debugger4.img(imglat, 'lattice image')
-            # insert this object mask image to not lattice part in black image
-            masklat = np.where(lattice == 1, 0, obj['mask'])
             self.debugger4.img(masklat, 'lattice mask')
 
             # unite all object lattice part image
