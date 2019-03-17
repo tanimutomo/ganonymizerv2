@@ -44,7 +44,7 @@ if __name__ == '__main__':
             'crop_rate': 0.5,
 
             # shadow detection
-            'obj_sml_thresh': 1e-3,
+            'obj_sml_thresh': 1e-3, # this param is also used in the pmd
             'obj_high_thresh': 0.2,
             'superpixel': 'quickshift',
             'shadow_high_thresh': 0.01,
@@ -60,7 +60,7 @@ if __name__ == '__main__':
             # inpaint
             'inpaint': 'EdgeConnect',
             'inpaint_ckpt': 'modules/edge_connect/checkpoints',
-            'sigma': 2
+            'sigma': 2 # for canny edge detection
             }
     
     main(img, config)
