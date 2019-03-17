@@ -15,8 +15,8 @@ class MaskDivider:
     def __init__(self, config, inpainter):
         self.config = config
         self.debugger = Debugger('exec', save_dir=config.checkpoint)
-        self.debugger2 = Debugger('debug', save_dir=config.checkpoint)
-        self.debugger3 = Debugger('debug', save_dir=config.checkpoint)
+        self.debugger2 = Debugger('exec', save_dir=config.checkpoint)
+        self.debugger3 = Debugger('exec', save_dir=config.checkpoint)
         self.debugger4 = Debugger('debug', save_dir=config.checkpoint)
         self.inpainter = inpainter
     
@@ -262,6 +262,7 @@ class MaskDivider:
                         (x + int(w * (7/8)), y + int(h * (11/16))),
                         1, hline_w)
 
+                lattice = np.where(obj['mask'] == 1, lattice, 0)
                 self.debugger4.img(lattice, 'lattice image')
                 lattice3c = np.stack([lattice for _ in range(3)], axis=-1).astype(np.uint8)
                 # insert inpainted image to lattice part in black image
