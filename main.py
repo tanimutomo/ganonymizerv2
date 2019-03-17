@@ -6,19 +6,27 @@ from modules.ganonymizer import GANonymizer
 from modules.utils import Config, Debugger
 
 
-def main(img, config):
+def main(impath, config):
     config = Config(config)
 
     # setup environment
     device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
 
-    # model prediction
+    # define the model
     model = GANonymizer(config, device)
-    model.predict(img)
+
+    # model prediction
+    if type(impath) == str:
+        model.predict(impath)
+    elif type(impath) == list:
+        for path in impath:
+            model.predict(path)
+    else:
+        raise RuntimeError('impath must be type of str or list object.')
 
 
 if __name__ == '__main__':
-    img = os.path.join(os.getcwd(), 'data/exp/cityscapes_testset/ex_01.png')
+    impath = os.path.join(os.getcwd(), 'data/exp/cityscapes_testset/ex_01.png')
     config = {
             # execution setting
             'checkpoint': 'data/exp/cityscapes_testset',
@@ -63,5 +71,5 @@ if __name__ == '__main__':
             'sigma': 2 # for canny edge detection
             }
     
-    main(img, config)
+    main(impath, config)
 
