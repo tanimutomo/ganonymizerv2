@@ -82,7 +82,6 @@ class GANonymizer:
         img = np.array(img)
 
         # visualization
-        self.debugger.matrix(img, 'Input Image')
         self.debugger.img(img, 'Input Image')
 
         return img
@@ -104,7 +103,6 @@ class GANonymizer:
                 pickle.dump(semseg_map, f)
 
         # visualization
-        self.debugger.matrix(semseg_map, 'Semantic Segmentation Map Prediction by DeepLabV3')
         self.debugger.img(semseg_map, 'Semantic Segmentation Map Prediction by DeepLabV3')
         self.debugger.imsave(semseg_map, self.fname + '_semsegmap.' + self.fext)
 
@@ -117,14 +115,12 @@ class GANonymizer:
 
         # combine the object mask and the shadow mask
         mask = np.where(omask + smask > 0, 255, 0).astype(np.uint8)
-        self.debugger.matrix(mask, 'Mask (Object Mask + Shadow Mask)')
         self.debugger.img(mask, 'Mask (Object Mask + Shadow Mask)', gray=True)
         self.debugger.imsave(mask, self.fname + '_mask.' + self.fext)
 
         # visualization the mask overlayed image
         mask3c = np.stack([mask, np.zeros_like(mask), np.zeros_like(mask)], axis=-1)
         overlay = (img * 0.7 + mask3c * 0.3).astype(np.uint8)
-        self.debugger.matrix(overlay, 'Mask Overlayed Image')
         self.debugger.img(overlay, 'Mask Overlayed Image')
         self.debugger.imsave(overlay, self.fname + '_mask_overlayed.' + self.fext)
 
@@ -153,14 +149,12 @@ class GANonymizer:
                 pickle.dump(omask, f)
 
         # visualization
-        self.debugger.matrix(omask, 'Object Mask')
         self.debugger.img(omask, 'Object Mask', gray=True)
         self.debugger.imsave(omask, self.fname + '_omask.' + self.fext)
 
         # visualize the mask overlayed image
         omask3c = np.stack([omask, np.zeros_like(omask), np.zeros_like(omask)], axis=-1)
         overlay = (img * 0.7 + omask3c * 0.3).astype(np.uint8)
-        self.debugger.matrix(overlay, 'Object Mask Overlayed Image')
         self.debugger.img(overlay, 'Object Mask Overlayed Image')
         self.debugger.imsave(overlay, self.fname + '_omask_overlayed.' + self.fext)
 
@@ -205,14 +199,12 @@ class GANonymizer:
             smask = np.zeros_like(mask)
 
         # visualization
-        self.debugger.matrix(smask, 'Shadow Mask')
         self.debugger.img(smask, 'Shadow Mask', gray=True)
         self.debugger.imsave(smask, self.fname + '_smask.' + self.fext)
 
         # visualize the mask overlayed image
         smask3c = np.stack([smask, np.zeros_like(smask), np.zeros_like(smask)], axis=-1)
         overlay = (img * 0.7 + smask3c * 0.3).astype(np.uint8)
-        self.debugger.matrix(overlay, 'Shadow Mask Overlayed Image')
         self.debugger.img(overlay, 'Shadow Mask Overlayed Image')
         self.debugger.imsave(overlay, self.fname + '_smask_overlayed.' + self.fext)
 
@@ -223,6 +215,33 @@ class GANonymizer:
         # pseudo mask division
         print('===== Pseudo Mask Division =====')
         divimg, divmask = self.mask_divider.divide(img, mask, self.fname, self.fext)
+
+        divimg_path = os.path.join(self.config.checkpoint, self.fname + '_divimg.' + 'pkl')
+        divmask_path = os.path.join(self.config.checkpoint, self.fname + '_divmask.' + 'pkl')
+
+        if self.config.divide_mode in ['exec', 'debug']:
+            divimg, divmask = self.mask_divider.divide(img, mask, self.fname, self.fext)
+        elif self.config.divide_mode is 'pass':
+            with open(divimg_path, mode='rb') as f:
+                divimg = pickle.load(f)
+            with open(divmask_path, mode='rb') as f:
+                divmask = pickle.load(f)
+        elif self.config.divide_mode is 'save':
+            divimg, divmask = self.mask_divider.divide(img, mask, self.fname, self.fext)
+            with open(divimg_path, mode='wb') as f:
+                pickle.dump(divimg, f)
+            with open(divmask_path, mode='wb') as f:
+                pickle.dump(divmask, f)
+        elif self.config.divide_mode is 'none':
+            divimg = img
+            divmask = mask
+
+        # visualization
+        self.debugger.img(divimg, 'Divided Image')
+        self.debugger.imsave(divimg, self.fname + '_divimg.' + self.fext)
+        self.debugger.img(divmask, 'Divided Mask', gray=True)
+        self.debugger.imsave(divmask, self.fname + '_divmask.' + self.fext)
+
         return divimg, divmask
 
 
@@ -252,13 +271,10 @@ class GANonymizer:
                 pickle.dump(edge, f)
 
         # visualization
-        self.debugger.matrix(edge, 'Edge')
         self.debugger.img(edge, 'Edge', gray=True)
         self.debugger.imsave(edge, self.fname + '_edge.' + self.fext)
-        self.debugger.matrix(inpainted_edge, 'Inpainted Edge')
         self.debugger.img(inpainted_edge, 'Inpainted Edge', gray=True)
         self.debugger.imsave(inpainted_edge, self.fname + '_inpainted_edge.' + self.fext)
-        self.debugger.matrix(inpainted, 'Inpainted Image')
         self.debugger.img(inpainted, 'Inpainted Image')
         self.debugger.imsave(inpainted, self.fname + '_inpainted.' + self.fext)
 
@@ -272,13 +288,11 @@ class GANonymizer:
             origin_wh = (box[2] - box[0], box[3] - box[1])
             output = cv2.resize(output, origin_wh)
             mask_part = cv2.resize(input['mask'], origin_wh)
-            self.debugger.matrix(output, 'output')
             self.debugger.img(output, 'output')
 
             out = np.zeros(img.shape, dtype=np.uint8)
             mask = np.zeros((img.shape[0], img.shape[1]), dtype=np.uint8)
             out[box[1]:box[3], box[0]:box[2], :] = output
-            self.debugger.matrix(out, 'out')
             self.debugger.img(out, 'out')
             mask[box[1]:box[3], box[0]:box[2]] = mask_part
             

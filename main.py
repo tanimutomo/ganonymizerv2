@@ -26,7 +26,7 @@ if __name__ == '__main__':
             # resize
             'resize_factor': 1,
         
-            # mode (choose in ['pass', 'exec', 'debug', 'save'])
+            # mode (choose in ['pass', 'save', 'exec', 'debug', 'none'])
             'main_mode': 'exec',
             'semseg_mode': 'pass',
             'mask_mode': 'pass',
