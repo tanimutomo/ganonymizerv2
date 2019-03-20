@@ -53,6 +53,7 @@ class MaskDivider:
         markers[~mask] = -1
         labelmap = random_walker(mask, markers)
         
+        labelmap = np.where(labelmap < 0, 0, labelmap)
         self.debugger.img(labelmap, 'labelmap', gray=True)
 
         return labelmap
@@ -67,8 +68,9 @@ class MaskDivider:
         unlabeled = mask - labeled
         self.debugger.img(unlabeled, 'unlabeled')
         unlabeled_map, _, labels = detect_object(unlabeled.astype(np.uint8))
-        for idx, label in enumerate(labels):
-            obj = np.where(unlabeled_map == label, lmax + idx + 1, 0).astype(labelmap.dtype)
+        for label in labels:
+            self.debugger.param(label, 'label number')
+            obj = np.where(unlabeled_map == label, lmax + label, 0).astype(labelmap.dtype)
             self.debugger.param(label, 'old label')
             self.debugger.param(np.max(obj), 'new label')
             self.debugger.img(obj, 'object')
@@ -84,12 +86,13 @@ class MaskDivider:
         # integrate separted small objects into big one
 
         removed_labels = []
-        # start from object label 1 (-1 and 0 is not object)
+        # start from object label 1 (0 is not object)
         for label in range(1, np.max(obj_labelmap) + 1):
+            self.debugger.param(label, 'label number')
             # create each object mask
             objmap = np.where(obj_labelmap == label, 1, 0).astype(np.uint8)
             objmap_wb = np.where(objmap == 1, 0, 1).astype(np.uint8)
-            self.debugger.img(objmap, 'object map')
+            # self.debugger.img(objmap, 'object map')
             self.debugger.img(objmap_wb, 'object map (white blob)')
             
             # calcurate area of the object
@@ -125,14 +128,14 @@ class MaskDivider:
             sur_labels = obj_labelmap[contours[1], contours[0]]
             self.debugger.matrix(sur_labels, 'surrounding labels')
 
-            # delete -1 label (background) from surrounding labels
-            sur_labels = np.delete(sur_labels, np.where(sur_labels == -1)[0])
+            # delete 0 label (background) from surrounding labels
+            sur_labels = np.delete(sur_labels, np.where(sur_labels == 0)[0])
 
-            # if all surrounding labels is -1, the following process is passed
+            # if all surrounding labels is 0, the following process is passed
             if sur_labels.size == 0: continue
 
             # calcurate most labels in surroundings
-            self.debugger.matrix(sur_labels, 'deleted -1 sur_labels')
+            self.debugger.matrix(sur_labels, 'deleted 0 sur_labels')
             label_count = Counter(sur_labels.tolist())
             most_sur_label = max(label_count, key=label_count.get)
             self.debugger.param(most_sur_label, 'most surrounding label')
@@ -152,10 +155,9 @@ class MaskDivider:
 
 
     def _classify_object(self, labelmap):
-        # change background label from -1 to 0
-        labelmap = np.where(labelmap < 0, 0, labelmap)
         objects = []
         for label in range(1, np.max(labelmap) + 1):
+            self.debugger.param(label, 'label number')
             # get object mask
             objmask = np.where(labelmap == label, 1, 0)
             self.debugger.img(objmask, 'objmask', gray=True)
