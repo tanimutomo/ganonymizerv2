@@ -49,6 +49,7 @@ if __name__ == '__main__':
 
             # mask
             'mask': 'entire',
+            'expand_width': 6,
             # separate
             'crop_rate': 0.5,
 

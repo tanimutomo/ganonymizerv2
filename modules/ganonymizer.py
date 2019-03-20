@@ -10,7 +10,7 @@ from .mask_creater import MaskCreater
 from .shadow_detecter import ShadowDetecter
 from .mask_divider import MaskDivider
 from .inpainter import Inpainter
-from .utils import Debugger
+from .utils import Debugger, expand_mask
 
 
 class GANonymizer:
@@ -41,7 +41,7 @@ class GANonymizer:
             # get object mask and shadow mask and combine them
             omask = self._object_mask(img, segmap)
             smask = self._detect_shadow(img, omask)
-            mask, expand_width = self._combine_masks(img, omask, smask)
+            mask = self._combine_masks(img, omask, smask)
 
             # Psuedo Mask Division
             divimg, divmask = self._divide_mask(img, mask)
@@ -55,7 +55,7 @@ class GANonymizer:
             pmd = 'off' if self.config.divide_mode is 'none' else 'on'
             out.save(os.path.join(self.config.output,
                 '{}_out_expanded_{}_shadow_{}_pmd_{}.{}'.format(
-                self.fname, expand_width, shadow, pmd, self.fext)))
+                self.fname, self.config.expand_width, shadow, pmd, self.fext)))
 
         # use separated mask for inpainting (this mode is failed)
         elif self.config.mask == 'separate':
@@ -96,7 +96,7 @@ class GANonymizer:
 
         # combine the object mask and the shadow mask
         mask = np.where(omask + smask > 0, 255, 0).astype(np.uint8)
-        mask, width = expand_mask(mask)
+        mask = expand_mask(mask, self.config.expand_width)
         self.debugger.img(mask, 'Mask (Object Mask + Shadow Mask)', gray=True)
         self.debugger.imsave(mask, self.fname + '_mask.' + self.fext)
 
@@ -112,7 +112,7 @@ class GANonymizer:
         self.debugger.img(img_with_mask, 'Image with Mask')
         self.debugger.imsave(img_with_mask, self.fname + '_img_with_mask.' + self.fext)
 
-        return mask, width
+        return mask
 
 
     def _semseg(self, img):

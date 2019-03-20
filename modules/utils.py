@@ -21,12 +21,12 @@ def detect_object(img):
     return label_map, stats[1:], label_list
 
 
-def expand_mask(mask):
+def expand_mask(mask, width):
+    if width == 0: return mask
     mask = mask.astype(np.uint8)
-    width = int((mask.shape[0] + mask.shape[1]) / 500)
     contours, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     mask = cv2.drawContours(mask, contours, -1, 255, width) 
-    return mask.astype(np.uint8), width
+    return mask.astype(np.uint8)
 
 
 def write_labels(img, segmap, size):
