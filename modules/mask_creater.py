@@ -24,9 +24,6 @@ class MaskCreater:
             obj_mask = np.where(obj_mask==do_id, 255, obj_mask).astype(np.uint8)
         obj_mask = np.where(obj_mask==255, 255, 0)
 
-        # expnad mask area by contours
-        # obj_mask = expand_mask(obj_mask)
-
         return obj_mask.astype(np.uint8)
 
 

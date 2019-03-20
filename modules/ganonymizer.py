@@ -10,7 +10,7 @@ from .mask_creater import MaskCreater
 from .shadow_detecter import ShadowDetecter
 from .mask_divider import MaskDivider
 from .inpainter import Inpainter
-from .utils import Debugger
+from .utils import Debugger, expand_mask
 
 
 class GANonymizer:
@@ -47,14 +47,15 @@ class GANonymizer:
             divimg, divmask = self._divide_mask(img, mask)
 
             # image and edge inpainting
-            out, _ = self._inpaint(divimg, divmask)
+            out = self._inpaint(divimg, divmask)
 
             # save output image by PIL
             out = Image.fromarray(out)
             shadow = 'off' if self.config.shadow_mode is 'none' else 'on'
             pmd = 'off' if self.config.divide_mode is 'none' else 'on'
-            out.save('./data/exp/cityscapes_testset/{}_out_shadow_{}_pmd_{}.{}'.format(
-                self.fname, shadow, pmd, self.fext))
+            out.save(os.path.join(self.config.output,
+                '{}_out_expanded_{}_shadow_{}_pmd_{}.{}'.format(
+                self.fname, self.config.expand_width, shadow, pmd, self.fext)))
 
         # use separated mask for inpainting (this mode is failed)
         elif self.config.mask == 'separate':
@@ -95,6 +96,7 @@ class GANonymizer:
 
         # combine the object mask and the shadow mask
         mask = np.where(omask + smask > 0, 255, 0).astype(np.uint8)
+        mask = expand_mask(mask, self.config.expand_width)
         self.debugger.img(mask, 'Mask (Object Mask + Shadow Mask)', gray=True)
         self.debugger.imsave(mask, self.fname + '_mask.' + self.fext)
 
@@ -171,7 +173,7 @@ class GANonymizer:
     def _inpaint(self, img, mask):
         # inpainter
         print('===== Image Inpainting and Edge Inpainting =====')
-        inpainted, inpainted_edge, edge = self._exec_module(self.config.divide_mode,
+        inpainted, inpainted_edge, edge = self._exec_module(self.config.inpaint_mode,
                 ['inpaint', 'inpaint_edge', 'edge'], self.inpainter.inpaint, img, mask)
 
         return inpainted

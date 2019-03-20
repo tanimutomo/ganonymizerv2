@@ -8,7 +8,7 @@ from skimage.morphology import label
 from skimage.feature import peak_local_max
 from skimage.segmentation import random_walker, relabel_sequential
 
-from .utils import expand_mask, detect_object, Debugger
+from .utils import Debugger, detect_object, write_labels
 
 
 class MaskDivider:
@@ -20,13 +20,16 @@ class MaskDivider:
 
     def divide(self, img, mask, fname, fext):
         # separate object in the mask using random walker algorithm
-        obj_labelmap = self._separate_objects(mask)
+        labelmap = self._separate_objects(mask)
+
+        # restore missing objects
+        labelmap = self._restore_missings(labelmap, mask)
 
         # integrate separted small objects into big one
-        obj_labelmap = self._remove_sml_obj(obj_labelmap)
+        labelmap = self._remove_sml_obj(labelmap)
 
         # get large object
-        objects = self._classify_object(obj_labelmap)
+        objects = self._classify_object(labelmap)
 
         # apply inpainting to resized image for each large object
         objects = self._get_sml_inpainted(objects, img, mask, fname, fext)
@@ -50,8 +53,32 @@ class MaskDivider:
         markers[~mask] = -1
         labelmap = random_walker(mask, markers)
         
+        labelmap = np.where(labelmap < 0, 0, labelmap)
         self.debugger.img(labelmap, 'labelmap', gray=True)
 
+        return labelmap
+
+
+    def _restore_missings(self, labelmap, mask):
+        lmax = np.max(labelmap)
+        self.debugger.param(lmax, 'max value of label')
+        self.debugger.param(labelmap, 'labelmap')
+        labeled = np.where(labelmap > 0, 1, 0).astype(np.int32)
+        mask = np.where(mask > 0, 1, 0).astype(np.int32)
+        unlabeled = mask - labeled
+        self.debugger.img(unlabeled, 'unlabeled')
+        unlabeled_map, _, labels = detect_object(unlabeled.astype(np.uint8))
+        for label in labels:
+            self.debugger.param(label, 'label number')
+            obj = np.where(unlabeled_map == label, lmax + label, 0).astype(labelmap.dtype)
+            self.debugger.param(label, 'old label')
+            self.debugger.param(np.max(obj), 'new label')
+            self.debugger.img(obj, 'object')
+            labelmap += obj
+
+        self.debugger.img(labelmap, 'restored labelmap')
+        self.debugger.img(write_labels(labelmap, labelmap, 1),
+                'restored labelmap with label number')
         return labelmap
 
 
@@ -59,12 +86,13 @@ class MaskDivider:
         # integrate separted small objects into big one
 
         removed_labels = []
-        # start from object label 1 (-1 and 0 is not object)
+        # start from object label 1 (0 is not object)
         for label in range(1, np.max(obj_labelmap) + 1):
+            self.debugger.param(label, 'label number')
             # create each object mask
             objmap = np.where(obj_labelmap == label, 1, 0).astype(np.uint8)
             objmap_wb = np.where(objmap == 1, 0, 1).astype(np.uint8)
-            self.debugger.img(objmap, 'object map')
+            # self.debugger.img(objmap, 'object map')
             self.debugger.img(objmap_wb, 'object map (white blob)')
             
             # calcurate area of the object
@@ -74,23 +102,40 @@ class MaskDivider:
             if area > obj_labelmap.shape[0] * obj_labelmap.shape[1] * self.config.obj_sml_thresh: continue
 
             # get contours(x, y) of the object
-            contours, _ = cv2.findContours(objmap_wb, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-            self.debugger.matrix(contours[1], 'contours')
+            try:
+                contours, _ = cv2.findContours(objmap_wb, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+                self.debugger.matrix(contours[1], 'contours')
+            except:
+                continue
+
+            contours = contours[1].squeeze().transpose()
+
+            # if object is located in the image edge, remove image edge point from contours
+            if contours.shape[1] >= obj_labelmap.shape[0] * 2 + obj_labelmap.shape[1] * 2:
+                self.debugger.matrix(contours, 'before contours')
+                for value in [0, obj_labelmap.shape[0] - 1, obj_labelmap.shape[1] - 1]:
+                    contours = np.where(contours == value, -1, contours)
+                self.debugger.matrix(np.where(contours[0] == -1)[0], '0 delete index')
+                self.debugger.matrix(np.where(contours[1] == -1)[0], '0 delete index')
+                delidx = np.unique(np.concatenate([np.where(contours[0] == -1)[0],
+                    np.where(contours[1] == -1)[0]]))
+                self.debugger.matrix(delidx, 'delete index')
+                contours = np.delete(contours, delidx, axis=-1)
+                self.debugger.matrix(contours, 'after contours')
 
             # detect surrounding object label
-            contours = contours[1].squeeze().transpose()
             self.debugger.matrix(contours, 'aranged contours')
             sur_labels = obj_labelmap[contours[1], contours[0]]
             self.debugger.matrix(sur_labels, 'surrounding labels')
 
-            # delete -1 label (background) from surrounding labels
-            sur_labels = np.delete(sur_labels, np.where(sur_labels == -1)[0])
+            # delete 0 label (background) from surrounding labels
+            sur_labels = np.delete(sur_labels, np.where(sur_labels == 0)[0])
 
-            # if all surrounding labels is -1, the following process is passed
+            # if all surrounding labels is 0, the following process is passed
             if sur_labels.size == 0: continue
 
             # calcurate most labels in surroundings
-            self.debugger.matrix(sur_labels, 'deleted -1 sur_labels')
+            self.debugger.matrix(sur_labels, 'deleted 0 sur_labels')
             label_count = Counter(sur_labels.tolist())
             most_sur_label = max(label_count, key=label_count.get)
             self.debugger.param(most_sur_label, 'most surrounding label')
@@ -99,19 +144,20 @@ class MaskDivider:
             obj_labelmap = np.where(obj_labelmap == label, most_sur_label, obj_labelmap)
             removed_labels.append(label)
 
-        # make label order sequential
+        # make labels order sequential
         for label in removed_labels:
             obj_labelmap = np.where(obj_labelmap > label, obj_labelmap - 1, obj_labelmap)
 
         self.debugger.img(obj_labelmap, 'output of object label map')
+        self.debugger.img(write_labels(obj_labelmap, obj_labelmap, 1),
+                'removed small object labelmap')
         return obj_labelmap
 
 
     def _classify_object(self, labelmap):
-        # change background label from -1 to 0
-        labelmap = np.where(labelmap < 0, 0, labelmap)
         objects = []
         for label in range(1, np.max(labelmap) + 1):
+            self.debugger.param(label, 'label number')
             # get object mask
             objmask = np.where(labelmap == label, 1, 0)
             self.debugger.img(objmask, 'objmask', gray=True)
