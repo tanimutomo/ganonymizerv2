@@ -24,9 +24,9 @@ def detect_object(img):
 def expand_mask(mask):
     mask = mask.astype(np.uint8)
     width = int((mask.shape[0] + mask.shape[1]) / 500)
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     mask = cv2.drawContours(mask, contours, -1, 255, width) 
-    return mask.astype(np.uint8)
+    return mask.astype(np.uint8), width
 
 
 def write_labels(img, segmap, size):
