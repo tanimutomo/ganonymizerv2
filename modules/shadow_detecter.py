@@ -8,7 +8,7 @@ from skimage.future import graph
 from sklearn.cluster import MeanShift
 from skimage.measure import regionprops
 
-from .utils import expand_mask, detect_object, Debugger
+from .utils import Debugger, expand_mask, detect_object, write_labels
 
 
 class ShadowDetecter:
@@ -143,7 +143,8 @@ class ShadowDetecter:
     def _add_all_ss(self, img, segmap, ss_labels, most_color):
         vis = mark_boundaries(img, segmap)
         self.debugger.matrix(ss_labels, 'Shadow Segment Labels')
-        self._visualize_seg_labels(img, segmap)
+        self.debugger.img(write_labels(img, segmap, 0.3),
+                'Image with Segmap Label')
 
         # create rag
         G = graph.rag_mean_color(img, segmap, mode='similarity')
@@ -319,17 +320,6 @@ class ShadowDetecter:
         return clst_mean
 
 
-    def _visualize_seg_labels(self, img, segmap):
-        vis = mark_boundaries(img, segmap)
-        labels = np.unique(segmap)
-        for label in labels:
-            ys, xs = np.where(segmap==label)
-            my, mx = np.median(ys).astype(np.int32), np.median(xs).astype(np.int32)
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            vis = cv2.putText(vis, str(label), (mx - 10, my), font, 0.3, (0, 255, 255), 1, cv2.LINE_AA)
-        self.debugger.img(vis, 'Bottom Image with Segmap Label')
-
-
     def _color_dist(self, label, color):
         gray = np.mean(color, axis=1)
         self.debugger.matrix(gray, 'Mean of Segment Median Color')
@@ -363,7 +353,8 @@ class ShadowDetecter:
         self.debugger.matrix(bot_segmap, 'Bottom segmap')
 
         # visualize segment label in the image
-        self._visualize_seg_labels(img, bot_segmap)
+        self.debugger.img(write_labels(img, bot_segmap, 0.3),
+                'Image with Segmap Label')
 
         return bot_segmap, label_mcolor
 
