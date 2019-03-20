@@ -24,7 +24,7 @@ def detect_object(img):
 def expand_mask(mask):
     mask = mask.astype(np.uint8)
     width = int((mask.shape[0] + mask.shape[1]) / 500)
-    contours, hierarchy = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     mask = cv2.drawContours(mask, contours, -1, 255, width) 
     return mask.astype(np.uint8)
 
@@ -80,7 +80,7 @@ class Debugger:
 
 
     def imsave(self, img, filename):
-        if self.mode is 'debug':
+        if self.mode in ['debug', 'save']:
             print(img.shape)
             path = os.path.join(self.save_dir, filename)
             if type(img) is torch.Tensor:
