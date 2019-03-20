@@ -47,7 +47,7 @@ class GANonymizer:
             divimg, divmask = self._divide_mask(img, mask)
 
             # image and edge inpainting
-            out, _ = self._inpaint(divimg, divmask)
+            out = self._inpaint(divimg, divmask)
 
             # save output image by PIL
             out = Image.fromarray(out)
@@ -171,7 +171,7 @@ class GANonymizer:
     def _inpaint(self, img, mask):
         # inpainter
         print('===== Image Inpainting and Edge Inpainting =====')
-        inpainted, inpainted_edge, edge = self._exec_module(self.config.divide_mode,
+        inpainted, inpainted_edge, edge = self._exec_module(self.config.inpaint_mode,
                 ['inpaint', 'inpaint_edge', 'edge'], self.inpainter.inpaint, img, mask)
 
         return inpainted
