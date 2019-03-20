@@ -81,7 +81,6 @@ class Debugger:
 
     def imsave(self, img, filename):
         if self.mode in ['debug', 'save']:
-            print(img.shape)
             path = os.path.join(self.save_dir, filename)
             if type(img) is torch.Tensor:
                 img = img.cpu().numpy().astype(np.uint8)
