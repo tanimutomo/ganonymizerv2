@@ -26,10 +26,11 @@ def main(impath, config):
 
 
 if __name__ == '__main__':
-    impath = os.path.join(os.getcwd(), 'data/exp/cityscapes_testset/ex_01.png')
+    impath = os.path.join(os.getcwd(), 'data/exp/cityscapes_testset/input/ex_01.png')
     config = {
             # execution setting
-            'checkpoint': 'data/exp/cityscapes_testset',
+            'checkpoint': 'data/exp/cityscapes_testset/ckpt',
+            'output': 'data/exp/cityscapes_testset/output',
 
             # resize
             'resize_factor': 1,
@@ -39,7 +40,7 @@ if __name__ == '__main__':
             'semseg_mode': 'pass',
             'mask_mode': 'pass',
             'shadow_mode': 'pass',
-            'divide_mode': 'exec',
+            'divide_mode': 'pass',
             'inpaint_mode': 'pass',
 
             # segmentation
