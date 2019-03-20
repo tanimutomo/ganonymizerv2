@@ -15,7 +15,6 @@ class MaskDivider:
     def __init__(self, config, inpainter):
         self.config = config
         self.debugger = Debugger(config.divide_mode, save_dir=config.checkpoint)
-        self.debugger_ = Debugger('debug', save_dir=config.checkpoint)
         self.inpainter = inpainter
     
 
@@ -110,16 +109,16 @@ class MaskDivider:
 
             # if object is located in the image edge, remove image edge point from contours
             if contours.shape[1] >= obj_labelmap.shape[0] * 2 + obj_labelmap.shape[1] * 2:
-                self.debugger_.matrix(contours, 'before contours')
+                self.debugger.matrix(contours, 'before contours')
                 for value in [0, obj_labelmap.shape[0] - 1, obj_labelmap.shape[1] - 1]:
                     contours = np.where(contours == value, -1, contours)
-                self.debugger_.matrix(np.where(contours[0] == -1)[0], '0 delete index')
-                self.debugger_.matrix(np.where(contours[1] == -1)[0], '0 delete index')
+                self.debugger.matrix(np.where(contours[0] == -1)[0], '0 delete index')
+                self.debugger.matrix(np.where(contours[1] == -1)[0], '0 delete index')
                 delidx = np.unique(np.concatenate([np.where(contours[0] == -1)[0],
                     np.where(contours[1] == -1)[0]]))
-                self.debugger_.matrix(delidx, 'delete index')
+                self.debugger.matrix(delidx, 'delete index')
                 contours = np.delete(contours, delidx, axis=-1)
-                self.debugger_.matrix(contours, 'after contours')
+                self.debugger.matrix(contours, 'after contours')
 
             # detect surrounding object label
             self.debugger.matrix(contours, 'aranged contours')
