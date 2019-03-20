@@ -8,7 +8,7 @@ from skimage.morphology import label
 from skimage.feature import peak_local_max
 from skimage.segmentation import random_walker, relabel_sequential
 
-from .utils import Debugger, expand_mask, detect_object, write_labels
+from .utils import Debugger, detect_object, write_labels
 
 
 class MaskDivider:

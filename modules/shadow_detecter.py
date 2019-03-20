@@ -117,11 +117,7 @@ class ShadowDetecter:
             # add all shadow mask dict
             shadow_masks.append({'bbox': bbox, 'mask': shadow_mask})
 
-        return expand_mask(
-                self._combine_masks(
-                    mask.shape, shadow_masks
-                    )
-                )
+        return self._combine_masks(mask.shape, shadow_masks)
 
 
     def _combine_masks(self, shape, mask_data):
