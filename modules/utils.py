@@ -57,7 +57,7 @@ class Debugger:
         self.mode = mode
         self.save_dir = save_dir
 
-    def img(self, img, comment, gray=False):
+    def img(self, img, comment):
         if self.mode is 'debug':
             print('-'*10, comment, '-'*10)
             self.matrix(img, comment)
@@ -66,7 +66,7 @@ class Debugger:
                 
             plt.figure(figsize=(10, 10), dpi=200)
             plt.imshow(img)
-            if gray:
+            if img.ndim == 2 and np.unique(img).size == 2:
                 plt.gray()
             plt.show()
             print('-' * (len(comment) + 22))
@@ -134,6 +134,45 @@ class AverageMeter:
         self.avg = self.sum / self.count
 
 
+# function for colorizing a label image:
+def label_img_to_color(img):
+    label_data = [
+            {'color': [128, 64,128], 'name': 'road'},
+            {'color': [244, 35,232], 'name': 'sidewalk'},
+            {'color': [ 70, 70, 70], 'name': 'building'},
+            {'color': [102,102,156], 'name': 'wall'},
+            {'color': [190,153,153], 'name': 'fence'},
+            {'color': [153,153,153], 'name': 'pole'},
+            {'color': [250,170, 30], 'name': 'traffic light'},
+            {'color': [220,220,  0], 'name': 'traffic sign'},
+            {'color': [107,142, 35], 'name': 'vegetation'},
+            {'color': [152,251,152], 'name': 'terrain'},
+            {'color': [ 70,130,180], 'name': 'sky'},
+            {'color': [220, 20, 60], 'name': 'person'},
+            {'color': [255,  0,  0], 'name': 'rider'},
+            {'color': [  0,  0,142], 'name': 'car'},
+            {'color': [  0,  0, 70], 'name': 'truck'},
+            {'color': [  0, 60,100], 'name': 'bus'},
+            {'color': [  0, 80,100], 'name': 'train'},
+            {'color': [  0,  0,230], 'name': 'motorcycle'},
+            {'color': [119, 11, 32], 'name': 'bicycle'},
+            {'color': [81,  0,  81], 'name': 'others'}
+            ]
+
+    img_height, img_width = img.shape
+    img3c = np.stack([img, img, img], axis=-1).astype(np.int32)
+    lc_img = np.zeros((800, 1050, 3), dtype=np.uint8)
+    
+    for label, data in enumerate(label_data):
+        img3c = np.where(img3c == [label, label, label], data['color'], img3c)
+        x, y = label % 4, int((label - (label % 4)) / 4)
+        tlx, tly = 50 + x * 250, 50 + y * 150
+        lc_img = cv2.rectangle(lc_img, (tlx, tly), (tlx + 200, tly + 100),
+                data['color'], thickness=-1)
+        lc_img = cv2.putText(lc_img, data['name'], (tlx + 10, tly + 90),
+                cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+
+    return img3c.astype(np.uint8), lc_img
 
 
 Label = namedtuple( 'Label' , [
