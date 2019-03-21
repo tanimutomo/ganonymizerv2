@@ -16,7 +16,6 @@ class MaskDivider:
         self.config = config
         self.debugger = Debugger(config.divide_mode, save_dir=config.checkpoint)
         self.inpainter = inpainter
-    
 
     def divide(self, img, mask, fname, fext):
         # separate object in the mask using random walker algorithm
@@ -39,7 +38,6 @@ class MaskDivider:
 
         return new_img, new_mask
 
-
     def _separate_objects(self, mask):
         # separate object in the mask using random walker algorithm
         # In obj_labelmap, -1 is background, 0 is none, object is from 1
@@ -57,7 +55,6 @@ class MaskDivider:
         self.debugger.img(labelmap, 'labelmap')
 
         return labelmap
-
 
     def _restore_missings(self, labelmap, mask):
         lmax = np.max(labelmap)
@@ -80,7 +77,6 @@ class MaskDivider:
         self.debugger.img(write_labels(labelmap, labelmap, 1),
                 'restored labelmap with label number')
         return labelmap
-
 
     def _remove_sml_obj(self, obj_labelmap):
         # integrate separted small objects into big one
@@ -153,7 +149,6 @@ class MaskDivider:
                 'removed small object labelmap')
         return obj_labelmap
 
-
     def _classify_object(self, labelmap):
         objects = []
         for label in range(1, np.max(labelmap) + 1):
@@ -202,7 +197,6 @@ class MaskDivider:
 
         self.debugger.param(objects, 'objects')
         return objects
-
 
     def _get_sml_inpainted(self, objects, img, mask, fname, fext):
         H, W = img.shape[0], img.shape[1]
@@ -269,7 +263,6 @@ class MaskDivider:
 
         self.debugger.param(objects, 'large objects')
         return objects
-
 
     def _divide_inputs(self, objects, img, mask):
         for idx, obj in enumerate(objects):

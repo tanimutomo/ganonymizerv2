@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from collections import Counter
 from skimage import color
+
 from skimage.segmentation import felzenszwalb, slic, quickshift, mark_boundaries
 from skimage.future import graph
 from sklearn.cluster import MeanShift
@@ -16,7 +17,6 @@ class ShadowDetecter:
         self.config = config
         self.thresh = 3
         self.debugger = Debugger(config.shadow_mode, save_dir=config.checkpoint)
-
 
     def detect(self, img, mask):
         # connected components
@@ -119,7 +119,6 @@ class ShadowDetecter:
 
         return self._combine_masks(mask.shape, shadow_masks)
 
-
     def _combine_masks(self, shape, mask_data):
         entire_mask = np.zeros(shape, dtype=np.uint8)
         for data in mask_data:
@@ -129,12 +128,10 @@ class ShadowDetecter:
         self.debugger.img(entire_mask, 'Entire Mask Image')
         return entire_mask
 
-
     def _mask_from_segmap(self, segmap):
         mask = segmap + 1
         mask = np.where(mask == np.max(mask), 0, 255)
         return mask.astype(np.uint8)
-
 
     def _add_all_ss(self, img, segmap, ss_labels, most_color):
         vis = mark_boundaries(img, segmap)
@@ -203,7 +200,6 @@ class ShadowDetecter:
 
         return ss_segmap, ss_labels
 
-
     def _obj_bot_filter(self, img, segmap):
         # create rag
         G = graph.rag_mean_color(img, segmap, mode='similarity')
@@ -258,21 +254,17 @@ class ShadowDetecter:
 
         return ss_segmap, ss_labels
 
-
     def _calc_centroid(self, segmap, label):
         segment = np.where(segmap == label, 255, 0).astype(np.uint8)
         centroid = regionprops(segment)[0]['centroid']
         return np.array(centroid).astype(np.int32)
-
 
     def _get_sc_segmap(self, img, segmap, cluster, labels, sc):
         # get shadow cluster segment's label
         idx = np.where(np.array(cluster) == sc)[0]
         sc_labels = labels[idx]
         sc_segmap = self._filtered_segmap(img, segmap, sc_labels)
-
         return sc_segmap
-
 
     def _filtered_segmap(self, img, segmap, labels):
         outside = np.max(segmap)
@@ -286,7 +278,6 @@ class ShadowDetecter:
         self.debugger.img(vis, 'Filtered Segment Map')
 
         return new_segmap
-
 
     def _get_shadow_cluster(self, cluster, means, counter):
         if len(cluster) < 10: return None, None
@@ -306,15 +297,12 @@ class ShadowDetecter:
 
         return low_mean_clst, most_clst_mean
 
-
     def _cluster_mean(self, cluster, value):
         clst_mean = []
         for clst in range(np.max(cluster)+1):
             idx = np.where(cluster==clst)[0]
             clst_mean.append(np.mean(value[idx]))
-
         return clst_mean
-
 
     def _color_dist(self, label, color):
         gray = np.mean(color, axis=1)
@@ -325,9 +313,7 @@ class ShadowDetecter:
             plt.figure(figsize=(10, 10), dpi=200)
             plt.bar(np.arange(gray.shape[0]), gray,
                 tick_label=label, align='center')
-
         return label, gray
-
 
     def _extract_bot_segment(self, img, segmap, point_img):
         # the label of object bottom area
@@ -354,7 +340,6 @@ class ShadowDetecter:
 
         return bot_segmap, label_mcolor
 
-
     def _segment_median_rgb(self, img, segmap, label):
         ys, xs = np.where(segmap==label)
         if len(list(img.shape)) == 3:
@@ -362,16 +347,13 @@ class ShadowDetecter:
         else:
             segment_color = img[ys, :][:, xs]
         color_median = np.median(segment_color, axis=(0, 1))
-
         return color_median
-
 
     def _box_img(self, img, box):
         if len(list(img.shape)) == 3:
             return img[box[1]:box[3], box[0]:box[2], :]
         else:
             return img[box[1]:box[3], box[0]:box[2]]
-
 
     def _get_bottom_box(self, img, ver_m, hor_m, W, H):
         box = self._get_bbox(img)
@@ -380,9 +362,7 @@ class ShadowDetecter:
         box[1] = box[1] + int((box[3] - box[1]) / 2)
         box[2] = box[2] + maxm if box[2] + maxm < W else W - 1
         box[3] = box[3] + maxm if box[3] + maxm < H else H - 1
-
         return box
-
 
     def _ver_hor_median(self, img):
         medians = []
@@ -400,11 +380,9 @@ class ShadowDetecter:
 
         return medians
 
-
     def _get_bbox(self, img):
         y, x = np.where(img==255)
         return np.array([np.min(x), np.min(y), np.max(x), np.max(y)])
-
 
     def _extract_obj_bot(self, img):
         H, W = img.shape
@@ -446,7 +424,6 @@ class ShadowDetecter:
 
         return filtered_contours
             
-        
     def _draw_contours_as_point(self, img, contours, area):
         # radius = int(np.sqrt(area) / 2)
         out = img.copy()
@@ -459,7 +436,6 @@ class ShadowDetecter:
                 # img_with_bottom = cv2.circle(img, point, radius, 127, thickness=-1)
 
         return out
-
 
     def _superpixel(self, img, method, ngc=False):
         if method == 'slic':
@@ -484,11 +460,9 @@ class ShadowDetecter:
 
         return segmap
 
-
     def _meanshift(self, data):
         ms = MeanShift(n_jobs=-1)
         ms.fit(data)
         out = ms.labels_
         return out
-
 

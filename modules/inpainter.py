@@ -13,14 +13,13 @@ class Inpainter():
         if self.config.inpaint == 'EdgeConnect':
             self.model = self._set_edge_connect()
 
-
     def inpaint(self, img, mask):
         output, out_edge, edge = self.model.inpaint(img, mask)
         return output, out_edge, edge
 
-
     def _set_edge_connect(self):
-        model = SimpleEdgeConnect(
-                self.config.inpaint_ckpt, self.config.sigma, self.device, self.debugger)
+        model = SimpleEdgeConnect(self.config.inpaint_ckpt, 
+                                  self.config.sigma, self.device,
+                                  self.debugger)
         return model
 
