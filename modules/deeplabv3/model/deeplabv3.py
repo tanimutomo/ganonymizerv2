@@ -84,8 +84,9 @@ class DeepLabV3(nn.Module):
 
 
     def _postprocess(self, img):
+        # (shape: (batch_size, num_classes, img_h, img_w))
         img = torch.squeeze(img, 0) # (shape: (num_classes, img_h, img_w))
-        img = img.data.cpu().numpy() # (shape: (batch_size, num_classes, img_h, img_w))
+        img = img.data.cpu().numpy() # (shape: (num_classes, img_h, img_w))
         pred_labels = np.argmax(img, axis=0) # (shape: (img_h, img_w))
         pred_labels = pred_labels.astype(np.uint8)
 
