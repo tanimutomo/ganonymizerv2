@@ -54,7 +54,7 @@ class MaskDivider:
         labelmap = random_walker(mask, markers)
         
         labelmap = np.where(labelmap < 0, 0, labelmap)
-        self.debugger.img(labelmap, 'labelmap', gray=True)
+        self.debugger.img(labelmap, 'labelmap')
 
         return labelmap
 
@@ -160,7 +160,7 @@ class MaskDivider:
             self.debugger.param(label, 'label number')
             # get object mask
             objmask = np.where(labelmap == label, 1, 0)
-            self.debugger.img(objmask, 'objmask', gray=True)
+            self.debugger.img(objmask, 'objmask')
 
             # calcurate object area
             area = np.sum(objmask)
