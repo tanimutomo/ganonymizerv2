@@ -10,7 +10,7 @@ from .mask_creater import MaskCreater
 from .shadow_detecter import ShadowDetecter
 from .mask_divider import MaskDivider
 from .inpainter import Inpainter
-from .utils import Debugger, expand_mask
+from .utils import Debugger, expand_mask, label_img_to_color
 
 
 class GANonymizer:
@@ -97,7 +97,7 @@ class GANonymizer:
         # combine the object mask and the shadow mask
         mask = np.where(omask + smask > 0, 255, 0).astype(np.uint8)
         mask = expand_mask(mask, self.config.expand_width)
-        self.debugger.img(mask, 'Mask (Object Mask + Shadow Mask)', gray=True)
+        self.debugger.img(mask, 'Mask (Object Mask + Shadow Mask)')
         self.debugger.imsave(mask, self.fname + '_mask.' + self.fext)
 
         # visualization the mask overlayed image
@@ -118,8 +118,15 @@ class GANonymizer:
     def _semseg(self, img):
         # semantic segmentation
         print('===== Semantic Segmentation =====')
-        semseg_map = self._exec_module(self.config.semseg_mode, 'segmap',
-                self.semseger.process, img)
+        if self.config.semseg_mode is 'none':
+            raise RuntimeError('semseg_mode should not be "none", if you want to execute entire GANonymizerV2')
+        else:
+            semseg_map = self._exec_module(self.config.semseg_mode, 'segmap',
+                    self.semseger.process, img)
+
+        vis, lc_img = label_img_to_color(semseg_map)
+        self.debugger.img(vis, 'color semseg map')
+        self.debugger.img(lc_img, 'label color map')
 
         return semseg_map
 
@@ -127,8 +134,11 @@ class GANonymizer:
     def _object_mask(self, img, semseg_map):
         # create mask image and image with mask
         print('===== Creating Mask Image =====')
-        omask = self._exec_module(self.config.mask_mode, 'omask',
-                self.mask_creater.mask, img, semseg_map)
+        if self.config.mask_mode is 'none':
+            raise RuntimeError('mask_mode should not be "none", if you want to execute entire GANonymizerV2')
+        else:
+            omask = self._exec_module(self.config.mask_mode, 'omask',
+                    self.mask_creater.mask, img, semseg_map)
 
         # visualize the mask overlayed image
         omask3c = np.stack([omask, np.zeros_like(omask), np.zeros_like(omask)], axis=-1)
@@ -173,8 +183,11 @@ class GANonymizer:
     def _inpaint(self, img, mask):
         # inpainter
         print('===== Image Inpainting and Edge Inpainting =====')
-        inpainted, inpainted_edge, edge = self._exec_module(self.config.inpaint_mode,
-                ['inpaint', 'inpaint_edge', 'edge'], self.inpainter.inpaint, img, mask)
+        if self.config.inpaint_mode is 'none':
+            raise RuntimeError('inpaint_mode should not be "none", if you want to execute entire GANonymizerV2')
+        else:
+            inpainted, inpainted_edge, edge = self._exec_module(self.config.inpaint_mode,
+                    ['inpaint', 'inpaint_edge', 'edge'], self.inpainter.inpaint, img, mask)
 
         return inpainted
 
