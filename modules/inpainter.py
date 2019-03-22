@@ -4,7 +4,7 @@ from .edge_connect.src.edge_connect import SimpleEdgeConnect
 from .utils import Debugger
 
 
-class Inpainter():
+class ImageInpainter():
     def __init__(self, config, device):
         self.config = config
         self.device = device

@@ -48,7 +48,7 @@ class SimpleEdgeConnect():
             if len(item.shape) == 3:
                 self.debugger.img(item, name)
             else:
-                self.debugger.img(item, name, gray=True)
+                self.debugger.img(item, name)
         img, gray, mask, edge = self._cuda_tensor(img, gray, mask, edge)
         for item, name in [(img, 'img'), (mask, 'mask'), (gray, 'gray'), (edge, 'edge')]:
             self.debugger.matrix(item, name)

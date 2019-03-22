@@ -4,12 +4,14 @@ import torch
 import pickle
 import numpy as np
 from PIL import Image
+
 from torchvision.transforms import ToTensor, ToPILImage
+
 from .semantic_segmenter import SemanticSegmenter
 from .mask_creater import MaskCreater
 from .shadow_detecter import ShadowDetecter
 from .mask_divider import MaskDivider
-from .inpainter import Inpainter
+from .inpainter import ImageInpainter
 from .utils import Debugger, expand_mask, label_img_to_color
 
 
@@ -17,16 +19,13 @@ class GANonymizer:
     def __init__(self, config, device):
         self.config = config
         self.devide = device
-
         self.debugger = Debugger(config.main_mode, save_dir=config.checkpoint)
-        self.to_tensor = ToTensor()
 
-        self.semseger = SemanticSegmenter(config, device)
-        self.mask_creater = MaskCreater(config)
-        self.shadow_detecter = ShadowDetecter(config)
-        self.inpainter = Inpainter(config, device)
-        self.mask_divider = MaskDivider(config, self.inpainter)
-
+        self.ss = SemanticSegmenter(config, device)
+        self.mc = MaskCreater(config)
+        self.sd = ShadowDetecter(config)
+        self.ii = ImageInpainter(config, device)
+        self.md = MaskDivider(config, self.ii)
     
     def predict(self, img_path):
         # loading input image
@@ -36,7 +35,7 @@ class GANonymizer:
         segmap = self._semseg(img)
 
         # use single entire mask (default)
-        if self.config.mask == 'entire':
+        if self.config.mask is 'entire':
 
             # get object mask and shadow mask and combine them
             omask = self._object_mask(img, segmap)
@@ -45,6 +44,11 @@ class GANonymizer:
 
             # Psuedo Mask Division
             divimg, divmask = self._divide_mask(img, mask)
+
+            # resize inputs
+            divimg = self._resize(divimg)
+            divmask = self._resize(divmask)
+            divmask = np.where(divmask > 127, 255, 0).astype(np.uint8)
 
             # image and edge inpainting
             out = self._inpaint(divimg, divmask)
@@ -58,7 +62,7 @@ class GANonymizer:
                 self.fname, self.config.expand_width, shadow, pmd, self.fext)))
 
         # use separated mask for inpainting (this mode is failed)
-        elif self.config.mask == 'separate':
+        elif self.config.mask is 'separate':
             inputs = self._separated_mask(img, segmap)
             inpainteds = []
             for input in inputs:
@@ -74,14 +78,11 @@ class GANonymizer:
             out.save('./data/exp/cityscapes_testset/{}_sep_out_resized_{}.{}'.format(
                 self.fname, self.config.resize_factor, self.fext))
 
-
     def _load_img(self, img_path):
         # Loading input image
         print('===== Loading Image =====')
         self.fname, self.fext = img_path.split('/')[-1].split('.')
         img = Image.open(img_path)
-        img = img.resize((int(img.width / self.config.resize_factor),
-            int(img.height / self.config.resize_factor)))
         img = np.array(img)
 
         # visualization
@@ -89,6 +90,12 @@ class GANonymizer:
 
         return img
 
+    def _resize(self, img):
+        # resize inputs
+        new_h = int(img.shape[0] / self.config.resize_factor)
+        new_w = int(img.shape[1] / self.config.resize_factor)
+        out = cv2.resize(img, (new_w, new_h)).astype(np.uint8)
+        return out
 
     def _combine_masks(self, img, omask, smask):
         # check omask and smak shape
@@ -114,7 +121,6 @@ class GANonymizer:
 
         return mask
 
-
     def _semseg(self, img):
         # semantic segmentation
         print('===== Semantic Segmentation =====')
@@ -122,14 +128,13 @@ class GANonymizer:
             raise RuntimeError('semseg_mode should not be "none", if you want to execute entire GANonymizerV2')
         else:
             semseg_map = self._exec_module(self.config.semseg_mode, 'segmap',
-                    self.semseger.process, img)
+                    self.ss.predict, img)
 
         vis, lc_img = label_img_to_color(semseg_map)
         self.debugger.img(vis, 'color semseg map')
         self.debugger.img(lc_img, 'label color map')
 
         return semseg_map
-
     
     def _object_mask(self, img, semseg_map):
         # create mask image and image with mask
@@ -138,7 +143,7 @@ class GANonymizer:
             raise RuntimeError('mask_mode should not be "none", if you want to execute entire GANonymizerV2')
         else:
             omask = self._exec_module(self.config.mask_mode, 'omask',
-                    self.mask_creater.mask, img, semseg_map)
+                    self.mc.entire_mask, img, semseg_map)
 
         # visualize the mask overlayed image
         omask3c = np.stack([omask, np.zeros_like(omask), np.zeros_like(omask)], axis=-1)
@@ -148,7 +153,6 @@ class GANonymizer:
 
         return omask
 
-
     def _detect_shadow(self, img, mask):
         # shadow detection
         print('===== Shadow Detection =====')
@@ -156,7 +160,7 @@ class GANonymizer:
             smask = np.zeros_like(mask).astype(np.uint8)
         else:
             smask = self._exec_module(self.config.shadow_mode, 'smask',
-                    self.shadow_detecter.detect, img, mask)
+                    self.ss.detect, img, mask)
 
         # visualize the mask overlayed image
         smask3c = np.stack([smask, np.zeros_like(smask), np.zeros_like(smask)], axis=-1)
@@ -166,7 +170,6 @@ class GANonymizer:
 
         return smask
 
-
     def _divide_mask(self, img, mask):
         # pseudo mask division
         print('===== Pseudo Mask Division =====')
@@ -175,10 +178,9 @@ class GANonymizer:
             divmask = mask
         else:
             divimg, divmask = self._exec_module(self.config.divide_mode, ['divimg', 'divmask'],
-                    self.mask_divider.divide, img, mask, self.fname, self.fext)
+                    self.md.divide, img, mask, self.fname, self.fext)
 
         return divimg, divmask
-
 
     def _inpaint(self, img, mask):
         # inpainter
@@ -187,19 +189,17 @@ class GANonymizer:
             raise RuntimeError('inpaint_mode should not be "none", if you want to execute entire GANonymizerV2')
         else:
             inpainted, inpainted_edge, edge = self._exec_module(self.config.inpaint_mode,
-                    ['inpaint', 'inpaint_edge', 'edge'], self.inpainter.inpaint, img, mask)
+                    ['inpaint', 'inpaint_edge', 'edge'], self.ii.inpaint, img, mask)
 
         return inpainted
-
 
     def _separated_mask(self, img, semseg_map):
         # create mask image and image with mask
         print('===== Create separated inputs =====')
         inputs = self._exec_module(self.config.mask_mode, 'sep_inputs',
-                self.mask_creater.separated_mask, img, semseg_map)
+                self.mc.separated_mask, img, semseg_map)
 
         return inputs
-
 
     def _integrate_outputs(self, img, inputs, outputs):
         self.debugger.img(img, 'original image')
@@ -222,9 +222,8 @@ class GANonymizer:
 
         return img
 
-
     def _exec_module(self, mode, names, func, *args):
-        if type(names) == str:
+        if isinstance(names, str):
             path = os.path.join(self.config.checkpoint, self.fname + '_{}.'.format(names) + 'pkl')
         else:
             paths = []
@@ -233,12 +232,12 @@ class GANonymizer:
                     self.fname + '_{}.'.format(name) + 'pkl'))
 
         if mode in ['exec', 'debug']:
-            if type(names) == str:
+            if isinstance(names, str):
                 result = func(*args)
             else:
                 results = list(func(*args))
         elif mode is 'pass':
-            if type(names) == str:
+            if isinstance(names, str):
                 with open(path, mode='rb') as f:
                     result = pickle.load(f)
             else:
@@ -247,7 +246,7 @@ class GANonymizer:
                     with open(path, mode='rb') as f:
                         results.append(pickle.load(f))
         elif mode is 'save':
-            if type(names) == str:
+            if isinstance(names, str):
                 result = func(*args)
                 with open(path, mode='wb') as f:
                     pickle.dump(result, f)
@@ -258,11 +257,10 @@ class GANonymizer:
                         pickle.dump(res, f)
 
         # visualization
-        if type(names) == str:
+        if isinstance(names, str):
             self.debugger.img(result, names)
             self.debugger.imsave(result, self.fname + '_{}.'.format(names) + self.fext)
             return result
-
         else:
             for res, name in zip(results, names):
                 self.debugger.img(res, name)

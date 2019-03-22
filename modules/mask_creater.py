@@ -10,7 +10,7 @@ class MaskCreater:
         self.thresh = 3
         self.debugger = Debugger(config.mask_mode, save_dir=config.checkpoint)
 
-    def mask(self, img, segmap):
+    def entire_mask(self, img, segmap):
         # collect dynamic object's id
         dynamic_object_ids = []
         for label in labels:
