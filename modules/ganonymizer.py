@@ -160,7 +160,7 @@ class GANonymizer:
             smask = np.zeros_like(mask).astype(np.uint8)
         else:
             smask = self._exec_module(self.config.shadow_mode, 'smask',
-                    self.ss.detect, img, mask)
+                    self.sd.detect, img, mask)
 
         # visualize the mask overlayed image
         smask3c = np.stack([smask, np.zeros_like(smask), np.zeros_like(smask)], axis=-1)
