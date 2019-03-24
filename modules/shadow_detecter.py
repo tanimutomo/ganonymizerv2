@@ -439,7 +439,7 @@ class ShadowDetecter:
 
     def _superpixel(self, img, method, ngc=False):
         if method == 'slic':
-            num_segments = int(img.shape[0] * img.shape[1] / 100)
+            num_segments = int(img.shape[0] * img.shape[1] / 1000)
             segmap = slic(img, n_segments=num_segments, compactness=10, sigma=1)
         elif method == 'felzenzwalb':
             segmap = felzenszwalb(img, scale=100, sigma=0.5, min_size=50)
