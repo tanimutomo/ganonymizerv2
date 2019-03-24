@@ -16,7 +16,7 @@ class SemanticSegmenter():
             raise RuntimeError('Please prepare {} model in modules/ .'.format(self.network))
 
 
-    def process(self, img):
+    def predict(self, img):
         # semantic segmentation
         semseg_map = self.model(img)
 

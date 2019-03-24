@@ -10,12 +10,12 @@ class MaskCreater:
         self.thresh = 3
         self.debugger = Debugger(config.mask_mode, save_dir=config.checkpoint)
 
-    
-    def mask(self, img, segmap):
+    def entire_mask(self, img, segmap):
         # collect dynamic object's id
         dynamic_object_ids = []
         for label in labels:
-            if (label.category is 'vehicle' or label.category is 'human') and label.trainId is not 19:
+            if ((label.category is 'vehicle' or label.category is 'human')
+                    and label.trainId is not 19):
                 dynamic_object_ids.append(label.trainId)
 
         # create the mask image using only segmap
@@ -25,7 +25,6 @@ class MaskCreater:
         obj_mask = np.where(obj_mask==255, 255, 0)
 
         return obj_mask.astype(np.uint8)
-
 
     def separated_mask(self, img, segmap, crop_rate):
         mask, _ = self.mask(img, segmap, labels)
@@ -68,7 +67,6 @@ class MaskCreater:
 
         return inputs
 
-
     def _crop_obj(self, top, bot, base, min_thresh, max_thresh):
         if top - base >= min_thresh:
             ntop = top - base
@@ -88,7 +86,6 @@ class MaskCreater:
 
         return ntop, nbot
 
-    
     def _adjust_imsize(self, img):
         size = np.array([img.shape[0], img.shape[1]])
         nsize = np.array([0, 0])
@@ -106,5 +103,4 @@ class MaskCreater:
         out = cv2.resize(img, (nsize[1], nsize[0]))
 
         return out
-
 
