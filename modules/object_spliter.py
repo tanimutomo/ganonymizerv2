@@ -18,6 +18,10 @@ class ObjectSpliter:
 
     def split(self, mask):
         # separate object in the mask using random walker algorithm
+        # filling holes in mask
+        if self.config.fill_hole is 'former':
+            mask = self._fill_hole(mask)
+
         # In labelmap, -1 is background, 0 is none, object is from 1
         mask = np.where(mask > 0, 1, 0).astype(np.bool)
 
@@ -36,7 +40,8 @@ class ObjectSpliter:
         # integrate separted small objects into big one
         labelmap = self._remove_sml_obj(labelmap)
         # fill the holes in objects
-        labelmap = self._fill_hole(labelmap)
+        if self.config.fill_hole is 'later':
+            labelmap = self._fill_hole(labelmap)
         # relabel from 1
         labelmap = self._relabel(labelmap)
 
@@ -155,7 +160,7 @@ class ObjectSpliter:
         return labelmap
 
     def _fill_hole(self, labelmap):
-        for label in range(1, np.max(labelmap)):
+        for label in range(1, np.max(labelmap)+1):
             objmap = np.where(labelmap == label, 0, 1).astype(np.uint8)
             if np.all(objmap == 1):
                 continue
