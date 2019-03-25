@@ -1,8 +1,7 @@
 import cv2
 import numpy as np
 
-from .utils import Debugger, labels
-from .submodule import expand_mask, detect_object
+from .utils import Debugger, labels, expand_mask, detect_object
 
 class MaskCreater:
     def __init__(self, config):
