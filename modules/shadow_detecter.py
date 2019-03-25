@@ -393,6 +393,8 @@ class ShadowDetecter:
         filtered_contours = []
         for cnt in contours:
             cnt = np.squeeze(cnt) # cnt's shape is (num, 2(x, y))
+            if cnt.size == 2:
+                continue
 
             # upside filtering
             upside_y = cnt[:, 1] - self.thresh
