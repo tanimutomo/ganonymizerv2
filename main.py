@@ -26,11 +26,12 @@ def main(impath, config):
 
 
 if __name__ == '__main__':
-    impath = os.path.join(os.getcwd(), 'data/exp/cityscapes_testset/input/ex_01.png')
+    path = os.path.join(os.getcwd(), 'data/exp/ablation_images')
+    impath = os.path.join(path, 'input', 'frankfurt_000000_000576_leftImg8bit.png')
     config = {
             # execution setting
-            'checkpoint': 'data/exp/cityscapes_testset/ckpt',
-            'output': 'data/exp/cityscapes_testset/output',
+            'checkpoint': os.path.join(path, 'ckpt'),
+            'output': os.path.join(path, 'output'),
 
             # resize
             'resize_factor': 1,
