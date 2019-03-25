@@ -56,6 +56,7 @@ if __name__ == '__main__':
             'crop_rate': 0.5,
             
             # separate mask to each object
+            'fill_hole': 'later',
             'obj_sml_thresh': 1e-3, # this param is also used in shadow detection
             'obj_sep_thresh': 1/3,
 
