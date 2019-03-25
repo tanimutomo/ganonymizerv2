@@ -18,29 +18,29 @@ class ShadowDetecter:
         self.thresh = 3
         self.debugger = Debugger(config.shadow_mode, save_dir=config.checkpoint)
 
-    def detect(self, img, mask):
-        # connected components
-        labelmap, stats, labels = detect_object(mask)
+    def detect(self, img, labelmap):
         shadow_masks = []
+        for label in range(1, np.max(labelmap)):
+            # get each object in turn
+            obj_mask = np.where(labelmap==label, 255, 0).astype(np.uint8)
 
-        for label, stat in zip(labels, stats):
             # get each object's image, mask and attribute
-            obj_mask, obj_img, bbox = self._get_obj_attribute(img, labelmap, label, stat)
+            obj_mask, obj_img, bbox, stat = self._get_obj_attribute(img, obj_mask, label)
             if obj_mask is None:
                 continue
-            
+
             # QuickShift Segmentation
             segmap = self._superpixel(obj_img, self.config.superpixel)
 
             # extract bottom area segments, label list, and each segments median color
-            bot_segmap, label, gray = self._extract_bottom_area_segments(
+            bot_segmap, labels, grays = self._extract_bottom_area_segments(
                     segmap, obj_mask, obj_img, bbox, stat)
-            if label is None:
+            if labels is None:
                 continue
 
             # get initial shadow segment using segment clustering and each cluter mean color
             ss_labels, most_color = self._extract_shadow_segments(
-                    obj_img, bot_segmap, label, gray)
+                    obj_img, bot_segmap, labels, grays)
             self.debugger.matrix(ss_labels, 'ss_labels before')
             if not ss_labels:
                 continue
@@ -53,20 +53,21 @@ class ShadowDetecter:
             shadow_mask = self._mask_from_segmap(ss_segmap)
 
             # add all shadow mask dict
-            shadow_masks.append({'bbox': bbox, 'mask': shadow_mask})
+            shadow_masks.append({'label': label, 'bbox': bbox, 'mask': shadow_mask})
 
-        return self._combine_masks(mask.shape, shadow_masks)
+        smask, labelmap = self._combine_masks(labelmap.shape, shadow_masks, labelmap)
+        return smask, labelmap
     
 
     ##### main method ##### 
 
-    def _get_obj_attribute(self, img, labelmap, label, stat):
-        # get each object in turn
-        obj_mask = np.where(labelmap==label, 255, 0).astype(np.uint8)
-
+    def _get_obj_attribute(self, img, obj_mask, label):
+        # get stats
+        stat = detect_object(obj_mask, self.debugger)[1][0]
+            
         # object area filtering
-        if stat[4] < labelmap.shape[0] * labelmap.shape[1] * self.config.obj_sml_thresh:
-            return None, None, None
+        if stat[4] < obj_mask.shape[0] * obj_mask.shape[1] * self.config.obj_sml_thresh:
+            return None, None, None, None
 
         # calcurate the median of object size
         hor_m, ver_m = self._ver_hor_median(obj_mask)
@@ -75,8 +76,8 @@ class ShadowDetecter:
         bbox = self._get_bottom_box(obj_mask, ver_m, hor_m, img.shape[1], img.shape[0])
 
         # object location filtering
-        if bbox[3] < labelmap.shape[0] * self.config.obj_high_thresh:
-            return None, None, None
+        if bbox[3] < obj_mask.shape[0] * self.config.obj_high_thresh:
+            return None, None, None, None
 
         # Visualize Objec Mask
         self.debugger.matrix(obj_mask, 'object mask')
@@ -97,7 +98,7 @@ class ShadowDetecter:
         # extract bottom area image
         obj_img = self._box_img(img_with_mask, bbox)
 
-        return obj_mask, obj_img, bbox
+        return obj_mask, obj_img, bbox, stat
 
     def _superpixel(self, img, method, ngc=False):
         if method == 'slic':
@@ -241,14 +242,20 @@ class ShadowDetecter:
         self.debugger.img(mask, 'shadow mask')
         return mask.astype(np.uint8)
 
-    def _combine_masks(self, shape, mask_data):
+    def _combine_masks(self, shape, mask_data, labelmap):
         entire_mask = np.zeros(shape, dtype=np.uint8)
         for data in mask_data:
-            bbox = data['bbox']
-            mask = data['mask']
+            label, bbox, mask = data['label'], data['bbox'], data['mask']
             entire_mask[bbox[1]:bbox[3], bbox[0]:bbox[2]] += mask
+
+            # create labelmap including shadow area
+            labelmask = np.zeros(shape, dtype=np.int32)
+            labelmask[bbox[1]:bbox[3], bbox[0]:bbox[2]] += mask
+            labelmask = np.where(labelmask > 0, label, 0)
+            labelmap = np.where(labelmap == 0, labelmask, labelmap)
+
         self.debugger.img(entire_mask, 'Entire Mask Image')
-        return entire_mask
+        return entire_mask, labelmap.astype(np.int32)
 
 
     ##### sub method ##### 
