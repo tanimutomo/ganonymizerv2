@@ -2,10 +2,8 @@ import os
 import cv2
 import numpy as np
 from PIL import Image
-from collections import Counter
 
-from .utils import Debugger
-from .submodule import detect_object, write_labels, separate_objects
+from .utils import Debugger, detect_object, write_labels
 
 
 class MaskDivider:
@@ -14,10 +12,7 @@ class MaskDivider:
         self.debugger = Debugger(config.divide_mode, save_dir=config.checkpoint)
         self.inpainter = inpainter
 
-    def divide(self, img, mask, fname, fext):
-        # separate object in the mask using random walker algorithm
-        labelmap = separate_objects(mask, self.debugger)
-
+    def divide(self, img, mask, labelmap, fname, fext):
         # get large object
         objects = self._classify_object(labelmap)
 
