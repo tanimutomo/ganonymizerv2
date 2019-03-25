@@ -1,68 +1,10 @@
 import os
 import cv2
 import torch
-import skimage
 import numpy as np
 from PIL import Image
-from scipy import ndimage
 import matplotlib.pyplot as plt
 from collections import namedtuple
-
-from skimage.morphology import label
-from skimage.feature import peak_local_max
-from skimage.segmentation import random_walker, mark_boundaries
-
-
-def tensor_img_to_numpy(tensor):
-    array = tensor.numpy()
-    array = np.transpose(array, (1, 2, 0))
-    return array
-
-
-def detect_object(img):
-    num, label_map, stats, _ = cv2.connectedComponentsWithStats(img)
-    # stat is [tl_x, tl_y, w, h, area]
-    label_list = [i+1 for i in range(num - 1)]
-    return label_map, stats[1:], label_list
-
-
-def expand_mask(mask, width):
-    if width == 0: return mask
-    mask = mask.astype(np.uint8)
-    contours, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-    mask = cv2.drawContours(mask, contours, -1, 255, width) 
-    return mask.astype(np.uint8)
-
-
-def write_labels(img, segmap, size):
-    out = mark_boundaries(img, segmap)
-    labels = np.unique(segmap)
-    for label in labels:
-        ys, xs = np.where(segmap==label)
-        my, mx = np.median(ys).astype(np.int32), np.median(xs).astype(np.int32)
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        out = cv2.putText(out, str(label), (mx - 10, my), font, size, (0, 255, 255), 1, cv2.LINE_AA)
-
-    return out
-
-
-def separate_objects(mask, debugger):
-    # separate object in the mask using random walker algorithm
-    # In obj_labelmap, -1 is background, 0 is none, object is from 1
-    mask = np.where(mask > 0, 1, 0).astype(np.bool)
-
-    ksize = int((mask.shape[0] + mask.shape[1]) / 30)
-    distance = ndimage.distance_transform_edt(mask)
-    local_maxi = peak_local_max(distance, indices=False, 
-            footprint=np.ones((ksize, ksize)), labels=mask)
-    markers = label(local_maxi)
-    markers[~mask] = -1
-    labelmap = random_walker(mask, markers)
-    
-    labelmap = np.where(labelmap < 0, 0, labelmap)
-    debugger.img(labelmap, 'labelmap')
-
-    return labelmap
 
 
 class Config(dict):
