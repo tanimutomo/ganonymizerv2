@@ -40,6 +40,7 @@ if __name__ == '__main__':
             'main_mode': 'exec',
             'semseg_mode': 'pass',
             'mask_mode': 'pass',
+            'split_mode': 'pass',
             'shadow_mode': 'pass',
             'divide_mode': 'pass',
             'inpaint_mode': 'pass',
@@ -53,9 +54,12 @@ if __name__ == '__main__':
             'expand_width': 6,
             # separate
             'crop_rate': 0.5,
+            
+            # separate mask to each object
+            'obj_sml_thresh': 1e-3, # this param is also used in shadow detection
+            'obj_sep_thresh': 1/3,
 
             # shadow detection
-            'obj_sml_thresh': 1e-3, # this param is also used in the pmd
             'obj_high_thresh': 0.2,
             'superpixel': 'quickshift',
             'shadow_high_thresh': 0.01,
