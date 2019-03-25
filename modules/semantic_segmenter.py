@@ -1,7 +1,7 @@
 import os
 import torch
 from .deeplabv3.model.deeplabv3 import DeepLabV3
-from .utils import tensor_img_to_numpy, Debugger
+from .utils import Debugger
 
 class SemanticSegmenter():
     def __init__(self, config, device):

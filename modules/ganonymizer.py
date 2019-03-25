@@ -12,8 +12,8 @@ from .mask_creater import MaskCreater
 from .shadow_detecter import ShadowDetecter
 from .mask_divider import MaskDivider
 from .inpainter import ImageInpainter
-from .utils import Debugger, expand_mask, label_img_to_color
-
+from .utils import Debugger, label_img_to_color
+from .submodule import expand_mask
 
 class GANonymizer:
     def __init__(self, config, device):

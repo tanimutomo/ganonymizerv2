@@ -4,7 +4,8 @@ import numpy as np
 from PIL import Image
 from collections import Counter
 
-from .utils import Debugger, detect_object, write_labels, separate_objects
+from .utils import Debugger
+from .submodule import detect_object, write_labels, separate_objects
 
 
 class MaskDivider:
