@@ -9,11 +9,11 @@ from torchvision.transforms import ToTensor, ToPILImage
 
 from .semantic_segmenter import SemanticSegmenter
 from .mask_creater import MaskCreater
+from .object_spliter import ObjectSpliter
 from .shadow_detecter import ShadowDetecter
 from .mask_divider import MaskDivider
 from .inpainter import ImageInpainter
-from .utils import Debugger, label_img_to_color
-from .submodule import expand_mask
+from .utils import Debugger, label_img_to_color, expand_mask
 
 class GANonymizer:
     def __init__(self, config, device):
@@ -23,6 +23,7 @@ class GANonymizer:
 
         self.ss = SemanticSegmenter(config, device)
         self.mc = MaskCreater(config)
+        self.op = ObjectSpliter(config)
         self.sd = ShadowDetecter(config)
         self.ii = ImageInpainter(config, device)
         self.md = MaskDivider(config, self.ii)
@@ -39,6 +40,11 @@ class GANonymizer:
 
             # get object mask and shadow mask and combine them
             omask = self._object_mask(img, segmap)
+
+            # get hole filled object mask and object labelmap
+            omask, labelmap = self._split_object(omask)
+
+            # detect shadow area and add shadow area to object mask
             smask = self._detect_shadow(img, omask)
             mask = self._combine_masks(img, omask, smask)
 
@@ -152,6 +158,17 @@ class GANonymizer:
         self.debugger.imsave(overlay, self.fname + '_omask_overlayed.' + self.fext)
 
         return omask
+
+    def _split_object(self, omask):
+        # split object mask
+        print('===== Object Split =====')
+        if self.config.split_mode is 'none':
+            omask, labelmap = omask, omask
+        else:
+            omask, labelmap  = self._exec_module(self.config.split_mode, ['omask', 'labelmap'],
+                    self.op.split, omask)
+
+        return omask, labelmap
 
     def _detect_shadow(self, img, mask):
         # shadow detection
