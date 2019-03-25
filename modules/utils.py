@@ -1,11 +1,16 @@
 import os
 import cv2
 import torch
+import skimage
 import numpy as np
 from PIL import Image
+from scipy import ndimage
 import matplotlib.pyplot as plt
 from collections import namedtuple
-from skimage.segmentation import mark_boundaries
+
+from skimage.morphology import label
+from skimage.feature import peak_local_max
+from skimage.segmentation import random_walker, mark_boundaries
 
 
 def tensor_img_to_numpy(tensor):
@@ -39,6 +44,25 @@ def write_labels(img, segmap, size):
         out = cv2.putText(out, str(label), (mx - 10, my), font, size, (0, 255, 255), 1, cv2.LINE_AA)
 
     return out
+
+
+def separate_objects(mask, debugger):
+    # separate object in the mask using random walker algorithm
+    # In obj_labelmap, -1 is background, 0 is none, object is from 1
+    mask = np.where(mask > 0, 1, 0).astype(np.bool)
+
+    ksize = int((mask.shape[0] + mask.shape[1]) / 30)
+    distance = ndimage.distance_transform_edt(mask)
+    local_maxi = peak_local_max(distance, indices=False, 
+            footprint=np.ones((ksize, ksize)), labels=mask)
+    markers = label(local_maxi)
+    markers[~mask] = -1
+    labelmap = random_walker(mask, markers)
+    
+    labelmap = np.where(labelmap < 0, 0, labelmap)
+    debugger.img(labelmap, 'labelmap')
+
+    return labelmap
 
 
 class Config(dict):

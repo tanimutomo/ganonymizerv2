@@ -2,13 +2,9 @@ import os
 import cv2
 import numpy as np
 from PIL import Image
-from scipy import ndimage
 from collections import Counter
-from skimage.morphology import label
-from skimage.feature import peak_local_max
-from skimage.segmentation import random_walker, relabel_sequential
 
-from .utils import Debugger, detect_object, write_labels
+from .utils import Debugger, detect_object, write_labels, separete_objects
 
 
 class MaskDivider:
@@ -19,7 +15,7 @@ class MaskDivider:
 
     def divide(self, img, mask, fname, fext):
         # separate object in the mask using random walker algorithm
-        labelmap = self._separate_objects(mask)
+        labelmap = separate_objects(mask, self.debugger)
 
         # restore missing objects
         labelmap = self._restore_missings(labelmap, mask)
@@ -38,23 +34,6 @@ class MaskDivider:
 
         return new_img, new_mask
 
-    def _separate_objects(self, mask):
-        # separate object in the mask using random walker algorithm
-        # In obj_labelmap, -1 is background, 0 is none, object is from 1
-        mask = np.where(mask > 0, 1, 0).astype(np.bool)
-
-        ksize = int((mask.shape[0] + mask.shape[1]) / 30)
-        distance = ndimage.distance_transform_edt(mask)
-        local_maxi = peak_local_max(distance, indices=False, 
-                footprint=np.ones((ksize, ksize)), labels=mask)
-        markers = label(local_maxi)
-        markers[~mask] = -1
-        labelmap = random_walker(mask, markers)
-        
-        labelmap = np.where(labelmap < 0, 0, labelmap)
-        self.debugger.img(labelmap, 'labelmap')
-
-        return labelmap
 
     def _restore_missings(self, labelmap, mask):
         lmax = np.max(labelmap)
