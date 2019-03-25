@@ -20,118 +20,148 @@ class ShadowDetecter:
 
     def detect(self, img, mask):
         # connected components
-        label_map, stats, labels = detect_object(mask)
+        labelmap, stats, labels = detect_object(mask)
         shadow_masks = []
 
         for label, stat in zip(labels, stats):
-            # get each object in turn
-            obj_mask = np.where(label_map==label, 255, 0).astype(np.uint8)
-
-            # object area filtering
-            if stat[4] < img.shape[0] * img.shape[1] * self.config.obj_sml_thresh:
+            # get each object's image, mask and attribute
+            obj_mask, obj_img, bbox = self._get_obj_attribute(img, labelmap, label, stat)
+            if obj_mask is None:
                 continue
-
-            # calcurate the median of object size
-            hor_m, ver_m = self._ver_hor_median(obj_mask)
-
-            # get the bbox of object's bottom area
-            bbox = self._get_bottom_box(obj_mask, ver_m, hor_m, img.shape[1], img.shape[0])
-
-            # object location filtering
-            if bbox[3] < img.shape[0] * self.config.obj_high_thresh:
-                continue
-
-            # Visualize Objec Mask
-            self.debugger.matrix(obj_mask, 'object mask')
-            self.debugger.img(obj_mask, 'object mask')
-
-            # image with mask
-            obj_mask_3c = np.stack([obj_mask for _ in range(3)], axis=-1)
-            img_with_mask = np.where(obj_mask_3c==255, obj_mask_3c, img).astype(np.uint8)
-
-            # visualization
-            self.debugger.matrix(bbox, 'bbox')
-            obj_with_bot_bbox = obj_mask.copy()
-            obj_with_bot_bbox = cv2.rectangle(obj_with_bot_bbox, (bbox[0], bbox[1]),
-                    (bbox[2], bbox[3]), 255, 2)
-            self.debugger.img(obj_with_bot_bbox,
-                    'Image of Object with Bottom Area based on object size medians')
-
-            # extract bottom area image
-            bot_img = self._box_img(img_with_mask, bbox)
-            self.debugger.matrix(bot_img, 'bottom area image')
-            self.debugger.img(bot_img, 'bottom area image')
             
             # QuickShift Segmentation
-            segmap = self._superpixel(bot_img, self.config.superpixel)
+            segmap = self._superpixel(obj_img, self.config.superpixel)
 
-            # extract segment which is bottom of object
-            obj_bot_mask = self._box_img(obj_mask, bbox)
-            self.debugger.img(obj_bot_mask, 'Object Mask Image')
-            point = self._extract_obj_bot(obj_bot_mask)
-            bot_point_img = np.zeros(obj_bot_mask.shape, dtype=np.uint8)
-            bot_point_img = self._draw_contours_as_point(bot_point_img, point, stat[4])
-            self.debugger.img(bot_point_img, 'Point of Object Bottom Area')
+            # extract bottom area segments, label list, and each segments median color
+            bot_segmap, label, gray = self._extract_bottom_area_segments(
+                    segmap, obj_mask, obj_img, bbox, stat)
 
-            # extract bottom area segment
-            bot_segmap, bot_segments_mcolor = self._extract_bot_segment(bot_img, segmap, bot_point_img)
-
-            # visualize color distribution
-            label, gray = self._color_dist(np.array(list(bot_segments_mcolor.keys())),
-                    np.array(list(bot_segments_mcolor.values())))
-
-            # clustering gray
-            cluster = self._meanshift(gray.reshape(-1, 1))
-            self.debugger.param(cluster, 'Belonging Cluster')
-            counter = Counter(list(cluster))
-            self.debugger.param(counter, 'Segment Count for each Cluster')
-            clst_mean = self._cluster_mean(cluster, gray)
-            self.debugger.param(clst_mean, 'Cluster Color Mean')
-
-            # get the lowest mean cluster as shadow cluster
-            shadow_clst, most_color = self._get_shadow_cluster(cluster, clst_mean, counter)
-
-            # this object doesn't have shadow
-            if shadow_clst is None:
+            # get initial shadow segment using segment clustering and each cluter mean color
+            ss_labels, most_color = self._extract_shadow_segments(
+                    obj_img, bot_segmap, label, gray)
+            self.debugger.matrix(ss_labels, 'ss_labels before')
+            if not ss_labels:
                 continue
-
-            # visualize shadow cluster segment
-            sc_segmap = self._get_sc_segmap(bot_img, bot_segmap, cluster, label, shadow_clst)
-            self.debugger.matrix(sc_segmap, 'Check sc_segmap')
-
-            # object bottom area fitering by segment's centroid
-            ss_segmap, ss_labels = self._obj_bot_filter(bot_img, sc_segmap)
-
-            # this object doesn't have shadow
-            if len(ss_labels) == 0:
-                continue
+            self.debugger.matrix(ss_labels, 'ss_labels after')
 
             # find other shadow segment using mean color and RAG
-            ss_segmap, ss_labels = self._add_all_ss(bot_img, segmap, ss_labels, most_color)
-            self.debugger.matrix(ss_segmap, 'shadow segment visualization')
+            ss_segmap, ss_labels = self._add_all_ss(obj_img, segmap, ss_labels, most_color)
 
             # create a part of shadow mask
             shadow_mask = self._mask_from_segmap(ss_segmap)
-            self.debugger.img(shadow_mask, 'shadow mask')
 
             # add all shadow mask dict
             shadow_masks.append({'bbox': bbox, 'mask': shadow_mask})
 
         return self._combine_masks(mask.shape, shadow_masks)
+    
 
-    def _combine_masks(self, shape, mask_data):
-        entire_mask = np.zeros(shape, dtype=np.uint8)
-        for data in mask_data:
-            bbox = data['bbox']
-            mask = data['mask']
-            entire_mask[bbox[1]:bbox[3], bbox[0]:bbox[2]] += mask
-        self.debugger.img(entire_mask, 'Entire Mask Image')
-        return entire_mask
+    ##### main method ##### 
 
-    def _mask_from_segmap(self, segmap):
-        mask = segmap + 1
-        mask = np.where(mask == np.max(mask), 0, 255)
-        return mask.astype(np.uint8)
+    def _get_obj_attribute(self, img, labelmap, label, stat):
+        # get each object in turn
+        obj_mask = np.where(labelmap==label, 255, 0).astype(np.uint8)
+
+        # object area filtering
+        if stat[4] < labelmap.shape[0] * labelmap.shape[1] * self.config.obj_sml_thresh:
+            return None, None, None
+
+        # calcurate the median of object size
+        hor_m, ver_m = self._ver_hor_median(obj_mask)
+
+        # get the bbox of object's bottom area
+        bbox = self._get_bottom_box(obj_mask, ver_m, hor_m, img.shape[1], img.shape[0])
+
+        # object location filtering
+        if bbox[3] < labelmap.shape[0] * self.config.obj_high_thresh:
+            return None, None, None
+
+        # Visualize Objec Mask
+        self.debugger.matrix(obj_mask, 'object mask')
+        self.debugger.img(obj_mask, 'object mask')
+
+        # image with mask
+        obj_mask_3c = np.stack([obj_mask for _ in range(3)], axis=-1)
+        img_with_mask = np.where(obj_mask_3c==255, obj_mask_3c, img).astype(np.uint8)
+
+        # visualization
+        self.debugger.matrix(bbox, 'bbox')
+        obj_with_bot_bbox = obj_mask.copy()
+        obj_with_bot_bbox = cv2.rectangle(obj_with_bot_bbox, (bbox[0], bbox[1]),
+                (bbox[2], bbox[3]), 255, 2)
+        self.debugger.img(obj_with_bot_bbox,
+                'Image of Object with Bottom Area based on object size medians')
+
+        # extract bottom area image
+        obj_img = self._box_img(img_with_mask, bbox)
+
+        return obj_mask, obj_img, bbox
+
+    def _superpixel(self, img, method, ngc=False):
+        if method == 'slic':
+            num_segments = int(img.shape[0] * img.shape[1] / 1000)
+            segmap = slic(img, n_segments=num_segments, compactness=10, sigma=1)
+        elif method == 'felzenzwalb':
+            segmap = felzenszwalb(img, scale=100, sigma=0.5, min_size=50)
+        elif method == 'quickshift':
+            segmap = quickshift(img, kernel_size=3, max_dist=6, ratio=0.5)
+
+        if ngc:
+            g = graph.rag_mean_color(img, segmap, mode='similarity')
+            segmap = graph.cut_normalized(segmap, g, thresh=0.3)
+            segmented_img = mark_boundaries(img, segmap)
+            self.debugger.img(segmented_img, 'Segmentation by {} followed by NGC'.format(method))
+        else:
+            segmented_img = mark_boundaries(img, segmap)
+            self.debugger.img(segmented_img, 'Segmentation by {}'.format(method))
+
+        return segmap
+
+    def _extract_bottom_area_segments(self, segmap, obj_mask, obj_img, bbox, stat):
+        # extract segment which is bottom of object
+        obj_bot_mask = self._box_img(obj_mask, bbox)
+        point = self._extract_obj_bot(obj_bot_mask)
+        bot_point_img = np.zeros(obj_bot_mask.shape, dtype=np.uint8)
+        bot_point_img = self._draw_contours_as_point(bot_point_img, point, stat[4])
+        self.debugger.img(bot_point_img, 'Point of Object Bottom Area')
+
+        # extract bottom area segment
+        bot_segmap, bot_segments_mcolor = self._extract_bot_segment(obj_img, segmap, bot_point_img)
+
+        # visualize color distribution
+        label, gray = self._color_dist(np.array(list(bot_segments_mcolor.keys())),
+                np.array(list(bot_segments_mcolor.values())))
+
+        return bot_segmap, label, gray
+
+    def _extract_shadow_segments(self, img, segmap, label, gray):
+        # clustering gray
+        cluster = self._meanshift(gray.reshape(-1, 1))
+        self.debugger.param(cluster, 'Belonging Cluster')
+        counter = Counter(list(cluster))
+        self.debugger.param(counter, 'Segment Count for each Cluster')
+        clst_mean = self._cluster_mean(cluster, gray)
+        self.debugger.param(clst_mean, 'Cluster Color Mean')
+
+        # get the lowest mean cluster as shadow cluster
+        shadow_clst, most_color = self._get_shadow_cluster(cluster, clst_mean, counter)
+
+        # this object doesn't have shadow
+        if shadow_clst is None:
+            return None, None
+
+        # visualize shadow cluster segment
+        sc_segmap = self._get_sc_segmap(img, segmap, cluster, label, shadow_clst)
+        self.debugger.matrix(sc_segmap, 'Check sc_segmap')
+
+        # object bottom area fitering by segment's centroid
+        ss_segmap, ss_labels = self._obj_bot_filter(img, sc_segmap)
+
+        # this object doesn't have shadow
+        if not ss_labels:
+            return None, None
+
+        return ss_labels, most_color
 
     def _add_all_ss(self, img, segmap, ss_labels, most_color):
         vis = mark_boundaries(img, segmap)
@@ -197,8 +227,27 @@ class ShadowDetecter:
 
         self.debugger.matrix(ss_labels, 'Updated SS labels')
         ss_segmap = self._filtered_segmap(img, segmap, ss_labels)
+        self.debugger.img(ss_segmap, 'shadow segment visualization')
 
         return ss_segmap, ss_labels
+
+    def _mask_from_segmap(self, segmap):
+        mask = segmap + 1
+        mask = np.where(mask == np.max(mask), 0, 255)
+        self.debugger.img(mask, 'shadow mask')
+        return mask.astype(np.uint8)
+
+    def _combine_masks(self, shape, mask_data):
+        entire_mask = np.zeros(shape, dtype=np.uint8)
+        for data in mask_data:
+            bbox = data['bbox']
+            mask = data['mask']
+            entire_mask[bbox[1]:bbox[3], bbox[0]:bbox[2]] += mask
+        self.debugger.img(entire_mask, 'Entire Mask Image')
+        return entire_mask
+
+
+    ##### sub method ##### 
 
     def _obj_bot_filter(self, img, segmap):
         # create rag
@@ -351,9 +400,11 @@ class ShadowDetecter:
 
     def _box_img(self, img, box):
         if len(list(img.shape)) == 3:
-            return img[box[1]:box[3], box[0]:box[2], :]
+            out = img[box[1]:box[3], box[0]:box[2], :]
         else:
-            return img[box[1]:box[3], box[0]:box[2]]
+            out = img[box[1]:box[3], box[0]:box[2]]
+        self.debugger.img(out, 'bottom area')
+        return out
 
     def _get_bottom_box(self, img, ver_m, hor_m, W, H):
         box = self._get_bbox(img)
@@ -439,28 +490,6 @@ class ShadowDetecter:
 
         return out
 
-    def _superpixel(self, img, method, ngc=False):
-        if method == 'slic':
-            num_segments = int(img.shape[0] * img.shape[1] / 1000)
-            segmap = slic(img, n_segments=num_segments, compactness=10, sigma=1)
-        elif method == 'felzenzwalb':
-            segmap = felzenszwalb(img, scale=100, sigma=0.5, min_size=50)
-        elif method == 'quickshift':
-            segmap = quickshift(img, kernel_size=3, max_dist=6, ratio=0.5)
-
-        if ngc:
-            g = graph.rag_mean_color(img, segmap, mode='similarity')
-            segmap = graph.cut_normalized(segmap, g, thresh=0.3)
-            segmented_img = mark_boundaries(img, segmap)
-            self.debugger.matrix(segmap, 'Segmentation by {} followed by NGC'.format(method))
-            self.debugger.img(segmented_img, 'Segmentation by {} followed by NGC'.format(method))
-        else:
-            segmented_img = mark_boundaries(img, segmap)
-            self.debugger.matrix(segmap, 'Segmentation by {}'.format(method))
-            self.debugger.img(segmented_img, 'Segmentation by {}'.format(method))
-
-
-        return segmap
 
     def _meanshift(self, data):
         ms = MeanShift(n_jobs=-1)
