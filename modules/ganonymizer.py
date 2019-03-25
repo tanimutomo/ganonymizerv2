@@ -165,13 +165,13 @@ class GANonymizer:
         # split object mask
         print('===== Object Split =====')
         if self.config.split_mode is 'none':
-            omask, labelmap = omask, omask
+            fmask, labelmap = omask, omask
         else:
-            omask, labelmap  = self._exec_module(self.config.split_mode,
-                                                 ['omask', 'olabelmap'],
+            fmask, labelmap  = self._exec_module(self.config.split_mode,
+                                                 ['fmask', 'olabelmap'],
                                                  self.op.split,
                                                  omask)
-        return omask, labelmap
+        return fmask, labelmap
 
     def _detect_shadow(self, img, labelmap):
         # shadow detection
