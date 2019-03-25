@@ -45,11 +45,11 @@ class GANonymizer:
             omask, labelmap = self._split_object(omask)
 
             # detect shadow area and add shadow area to object mask
-            smask = self._detect_shadow(img, omask)
+            smask, labelmap = self._detect_shadow(img, labelmap)
             mask = self._combine_masks(img, omask, smask)
 
             # Psuedo Mask Division
-            divimg, divmask = self._divide_mask(img, mask)
+            divimg, divmask = self._divide_mask(img, mask, labelmap)
 
             # resize inputs
             divimg = self._resize(divimg)
@@ -133,8 +133,10 @@ class GANonymizer:
         if self.config.semseg_mode is 'none':
             raise RuntimeError('semseg_mode should not be "none", if you want to execute entire GANonymizerV2')
         else:
-            semseg_map = self._exec_module(self.config.semseg_mode, 'segmap',
-                    self.ss.predict, img)
+            semseg_map = self._exec_module(self.config.semseg_mode,
+                                           'segmap',
+                                           self.ss.predict,
+                                           img)
 
         vis, lc_img = label_img_to_color(semseg_map)
         self.debugger.img(vis, 'color semseg map')
@@ -165,38 +167,41 @@ class GANonymizer:
         if self.config.split_mode is 'none':
             omask, labelmap = omask, omask
         else:
-            omask, labelmap  = self._exec_module(self.config.split_mode, ['omask', 'labelmap'],
-                    self.op.split, omask)
-
+            omask, labelmap  = self._exec_module(self.config.split_mode,
+                                                 ['omask', 'olabelmap'],
+                                                 self.op.split,
+                                                 omask)
         return omask, labelmap
 
-    def _detect_shadow(self, img, mask):
+    def _detect_shadow(self, img, labelmap):
         # shadow detection
         print('===== Shadow Detection =====')
         if self.config.shadow_mode is 'none':
-            smask = np.zeros_like(mask).astype(np.uint8)
+            smask, labelmap = np.zeros_like(labelmap).astype(np.uint8), labelmap
         else:
-            smask = self._exec_module(self.config.shadow_mode, 'smask',
-                    self.sd.detect, img, mask)
-
+            smask, labelmap = self._exec_module(self.config.shadow_mode,
+                                                ['smask', 'slabelmap'],
+                                                self.sd.detect,
+                                                img, labelmap)
         # visualize the mask overlayed image
         smask3c = np.stack([smask, np.zeros_like(smask), np.zeros_like(smask)], axis=-1)
         overlay = (img * 0.7 + smask3c * 0.3).astype(np.uint8)
         self.debugger.img(overlay, 'Shadow Mask Overlayed Image')
         self.debugger.imsave(overlay, self.fname + '_smask_overlayed.' + self.fext)
 
-        return smask
+        return smask, labelmap
 
-    def _divide_mask(self, img, mask):
+    def _divide_mask(self, img, mask, labelmap):
         # pseudo mask division
         print('===== Pseudo Mask Division =====')
         if self.config.divide_mode is 'none':
             divimg = img
             divmask = mask
         else:
-            divimg, divmask = self._exec_module(self.config.divide_mode, ['divimg', 'divmask'],
-                    self.md.divide, img, mask, self.fname, self.fext)
-
+            divimg, divmask = self._exec_module(self.config.divide_mode,
+                                                ['divimg', 'divmask'],
+                                                self.md.divide,
+                                                img, mask, labelmap, self.fname, self.fext)
         return divimg, divmask
 
     def _inpaint(self, img, mask):
@@ -206,8 +211,8 @@ class GANonymizer:
             raise RuntimeError('inpaint_mode should not be "none", if you want to execute entire GANonymizerV2')
         else:
             inpainted, inpainted_edge, edge = self._exec_module(self.config.inpaint_mode,
-                    ['inpaint', 'inpaint_edge', 'edge'], self.ii.inpaint, img, mask)
-
+                                                                ['inpaint', 'inpaint_edge', 'edge'],
+                                                                self.ii.inpaint, img, mask)
         return inpainted
 
     def _separated_mask(self, img, semseg_map):
@@ -215,7 +220,6 @@ class GANonymizer:
         print('===== Create separated inputs =====')
         inputs = self._exec_module(self.config.mask_mode, 'sep_inputs',
                 self.mc.separated_mask, img, semseg_map)
-
         return inputs
 
     def _integrate_outputs(self, img, inputs, outputs):
