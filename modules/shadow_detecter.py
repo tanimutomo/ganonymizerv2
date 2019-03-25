@@ -35,6 +35,8 @@ class ShadowDetecter:
             # extract bottom area segments, label list, and each segments median color
             bot_segmap, label, gray = self._extract_bottom_area_segments(
                     segmap, obj_mask, obj_img, bbox, stat)
+            if label is None:
+                continue
 
             # get initial shadow segment using segment clustering and each cluter mean color
             ss_labels, most_color = self._extract_shadow_segments(
@@ -128,11 +130,13 @@ class ShadowDetecter:
         # extract bottom area segment
         bot_segmap, bot_segments_mcolor = self._extract_bot_segment(obj_img, segmap, bot_point_img)
 
-        # visualize color distribution
-        label, gray = self._color_dist(np.array(list(bot_segments_mcolor.keys())),
-                np.array(list(bot_segments_mcolor.values())))
-
-        return bot_segmap, label, gray
+        # color distribution
+        if not bot_segments_mcolor:
+            return bot_segmap, None, None
+        else:
+            label, gray = self._color_dist(np.array(list(bot_segments_mcolor.keys())),
+                    np.array(list(bot_segments_mcolor.values())))
+            return bot_segmap, label, gray
 
     def _extract_shadow_segments(self, img, segmap, label, gray):
         # clustering gray
