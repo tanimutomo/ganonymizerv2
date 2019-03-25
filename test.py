@@ -34,7 +34,7 @@ if __name__ == '__main__':
             'resize_factor': 1,
         
             # mode (choose in ['pass', 'save', 'exec', 'debug', 'none'])
-            'main_mode': 'exec',
+            'main_mode': 'save',
             'semseg_mode': 'save',
             'mask_mode': 'save',
             'shadow_mode': 'save',
