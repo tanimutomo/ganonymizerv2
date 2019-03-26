@@ -13,7 +13,7 @@ from .object_spliter import ObjectSpliter
 from .shadow_detecter import ShadowDetecter
 from .mask_divider import MaskDivider
 from .inpainter import ImageInpainter
-from .utils import Debugger, label_img_to_color, expand_mask
+from .utils import Debugger, label_img_to_color, expand_mask, random_mask
 
 class GANonymizer:
     def __init__(self, config, device):
@@ -35,54 +35,41 @@ class GANonymizer:
         # semantic segmentation for detecting dynamic objects and creating mask
         segmap = self._semseg(img)
 
-        # use single entire mask (default)
-        if self.config.mask is 'entire':
+        # get object mask and shadow mask and combine them
+        omask = self._object_mask(img, segmap)
 
-            # get object mask and shadow mask and combine them
-            omask = self._object_mask(img, segmap)
+        # get hole filled object mask and object labelmap
+        omask, labelmap = self._split_object(omask)
 
-            # get hole filled object mask and object labelmap
-            omask, labelmap = self._split_object(omask)
+        # detect shadow area and add shadow area to object mask
+        smask, labelmap = self._detect_shadow(img, labelmap)
+        mask, labelmap = self._combine_masks(img, omask, smask, labelmap)
 
-            # detect shadow area and add shadow area to object mask
-            smask, labelmap = self._detect_shadow(img, labelmap)
-            mask, labelmap = self._combine_masks(img, omask, smask, labelmap)
+        # evaluate the effect of PMD
+        if self.config.evaluate_pmd:
+            mask, labelmap = random_mask(mask, labelmap)
 
-            # Psuedo Mask Division
-            divimg, divmask = self._divide_mask(img, mask, labelmap)
+        # Psuedo Mask Division
+        divimg, divmask = self._divide_mask(img, mask, labelmap)
 
-            # resize inputs
-            divimg = self._resize(divimg)
-            divmask = self._resize(divmask)
-            divmask = np.where(divmask > 127, 255, 0).astype(np.uint8)
+        # resize inputs
+        divimg = self._resize(divimg)
+        divmask = self._resize(divmask)
+        divmask = np.where(divmask > 127, 255, 0).astype(np.uint8)
 
-            # image and edge inpainting
-            out = self._inpaint(divimg, divmask)
+        # image and edge inpainting
+        out = self._inpaint(divimg, divmask)
 
-            # save output image by PIL
-            out = Image.fromarray(out)
-            shadow = 'off' if self.config.shadow_mode is 'none' else 'on'
-            pmd = 'off' if self.config.divide_mode is 'none' else 'on'
-            out.save(os.path.join(self.config.output,
-                '{}_out_expanded_{}_shadow_{}_pmd_{}.{}'.format(
-                self.fname, self.config.expand_width, shadow, pmd, self.fext)))
+        # save output image by PIL
+        outimg = Image.fromarray(out)
+        shadow = 'off' if self.config.shadow_mode is 'none' else 'on'
+        pmd = 'off' if self.config.divide_mode is 'none' else 'on'
+        outimg.save(os.path.join(self.config.output,
+            '{}_out_expanded_{}_shadow_{}_pmd_{}.{}'.format(
+            self.fname, self.config.expand_width, shadow, pmd, self.fext)))
 
-        # use separated mask for inpainting (this mode is failed)
-        elif self.config.mask is 'separate':
-            inputs = self._separated_mask(img, segmap)
-            inpainteds = []
-            for input in inputs:
-                if input['area'] <= 400:
-                    inpainted = cv2.inpaint(input['img'], input['mask'], 3, cv2.INPAINT_NS)
-                else:
-                    inpainted, inpainted_edge = self._inpaint(input['img'], input['mask'])
-                inpainteds.append(inpainted)
-            
-            out = self._integrate_outputs(img, inputs, inpainteds)
-            self.debugger.img(out, 'Final Output')
-            out = Image.fromarray(out)
-            out.save('./data/exp/cityscapes_testset/{}_sep_out_resized_{}.{}'.format(
-                self.fname, self.config.resize_factor, self.fext))
+        return out
+
 
     def _load_img(self, img_path):
         # Loading input image
@@ -222,34 +209,6 @@ class GANonymizer:
                                                                 ['inpaint', 'inpaint_edge', 'edge'],
                                                                 self.ii.inpaint, img, mask)
         return inpainted
-
-    def _separated_mask(self, img, semseg_map):
-        # create mask image and image with mask
-        print('===== Create separated inputs =====')
-        inputs = self._exec_module(self.config.mask_mode, 'sep_inputs',
-                self.mc.separated_mask, img, semseg_map)
-        return inputs
-
-    def _integrate_outputs(self, img, inputs, outputs):
-        self.debugger.img(img, 'original image')
-        for input, output in zip(inputs, outputs):
-            box = input['box']
-            origin_wh = (box[2] - box[0], box[3] - box[1])
-            output = cv2.resize(output, origin_wh)
-            mask_part = cv2.resize(input['mask'], origin_wh)
-            self.debugger.img(output, 'output')
-
-            out = np.zeros(img.shape, dtype=np.uint8)
-            mask = np.zeros((img.shape[0], img.shape[1]), dtype=np.uint8)
-            out[box[1]:box[3], box[0]:box[2], :] = output
-            self.debugger.img(out, 'out')
-            mask[box[1]:box[3], box[0]:box[2]] = mask_part
-            
-            mask = np.stack([mask for _ in range(3)], axis=-1)
-            img = np.where(mask==255, out, img)
-            self.debugger.img(img, 'img')
-
-        return img
 
     def _exec_module(self, mode, names, func, *args):
         if isinstance(names, str):
