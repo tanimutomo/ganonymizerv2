@@ -42,6 +42,35 @@ def write_labels(img, segmap, size):
     return out
 
 
+class CreateRandMask:
+    def __init__(self, min_size, max_size):
+        self.min_size = min_size
+        self.max_size = max_size
+    
+    def sample(self, mask):
+        mask = np.where(mask > 0, 1, 0)
+        rmask = np.zeros_like(mask)
+        is_rmask_match = True
+        while is_rmask_match:
+            short_diameter, long_diameter, angle, cx, cy = self._sample_ellipse_coord(mask)
+            rmask = cv2.ellipse(rmask, (cx, cy), (long_diameter, short_diameter),
+                                angle, 0, 360, 1, -1)
+            if not np.any(mask + rmask > 1):
+                is_rmask_match = False
+        return rmask.astype(np.uint8) * 255
+
+    def _sample_ellipse_coord(self, mask):
+        while True:
+            short_diameter = random.randint(self.min_size, self.max_size)
+            long_diameter = random.randint(self.min_size, self.max_size)
+            if short_diameter < long_diameter:
+                break
+        angle = random.randint(0, 180)
+        cx = random.randint(self.max_size, mask.shape[1] - self.max_size),
+        cy = random.randint(self.max_size, mask.shape[0] - self.max_size)
+        return short_diameter, long_diameter, angle, cx, cy
+
+
 class Config(dict):
     def __init__(self, config):
         self._conf = config
