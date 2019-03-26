@@ -104,21 +104,21 @@ class MaskDivider:
             self.debugger.img(resmask, 'resized mask')
 
             # apply inpainting
-            paths = [
-                    os.path.join(self.config.checkpoint, fname + '_{}_sml_inp.'.format(idx) + fext),
-                    os.path.join(self.config.checkpoint, fname + '_{}_sml_inpe.'.format(idx) + fext),
-                    os.path.join(self.config.checkpoint, fname + '_{}_sml_edge.'.format(idx) + fext)
-                    ]
-            self.debugger.param(paths, 'paths')
-            if os.path.exists(paths[0]) and self.debugger.mode != 'debug':
-                inpainted = np.array(Image.open(paths[0]))
-                inpainted_edge = np.array(Image.open(paths[1]))
-                edge = np.array(Image.open(paths[2]))
-            else:
-                inpainted, inpainted_edge, edge = self.inpainter.inpaint(resimg, resmask) 
-                Image.fromarray(inpainted).save(paths[0])
-                Image.fromarray(inpainted_edge).save(paths[1])
-                Image.fromarray(edge).save(paths[2])
+            # paths = [
+            #         os.path.join(self.config.checkpoint, fname + '_{}_sml_inp.'.format(idx) + fext),
+            #         os.path.join(self.config.checkpoint, fname + '_{}_sml_inpe.'.format(idx) + fext),
+            #         os.path.join(self.config.checkpoint, fname + '_{}_sml_edge.'.format(idx) + fext)
+            #         ]
+            # self.debugger.param(paths, 'paths')
+            # if os.path.exists(paths[0]) and self.debugger.mode != 'debug':
+            #     inpainted = np.array(Image.open(paths[0]))
+            #     inpainted_edge = np.array(Image.open(paths[1]))
+            #     edge = np.array(Image.open(paths[2]))
+            # else:
+            inpainted, inpainted_edge, edge = self.inpainter.inpaint(resimg, resmask) 
+            # Image.fromarray(inpainted).save(paths[0])
+            # Image.fromarray(inpainted_edge).save(paths[1])
+            # Image.fromarray(edge).save(paths[2])
 
             self.debugger.img(inpainted, 'inpainted')
             self.debugger.img(inpainted_edge, 'inpainted_edge')
