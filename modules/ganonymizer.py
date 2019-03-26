@@ -13,7 +13,7 @@ from .object_spliter import ObjectSpliter
 from .shadow_detecter import ShadowDetecter
 from .mask_divider import MaskDivider
 from .inpainter import ImageInpainter
-from .utils import Debugger, label_img_to_color, expand_mask, random_mask
+from .utils import Debugger, label_img_to_color, expand_mask, CreateRandMask
 
 class GANonymizer:
     def __init__(self, config, device):
@@ -47,7 +47,10 @@ class GANonymizer:
 
         # evaluate the effect of PMD
         if self.config.evaluate_pmd:
-            mask, labelmap = random_mask(mask, labelmap)
+            rmask_creater = CreateRandMask(self.config.rmask_min,
+                                           self.config.rmask_max)
+            rmask = rmask_creater.sample(mask)
+            labelmap = rmask.copy()
 
         # Psuedo Mask Division
         divimg, divmask = self._divide_mask(img, mask, labelmap)
@@ -60,13 +63,8 @@ class GANonymizer:
         # image and edge inpainting
         out = self._inpaint(divimg, divmask)
 
-        # save output image by PIL
-        outimg = Image.fromarray(out)
-        shadow = 'off' if self.config.shadow_mode is 'none' else 'on'
-        pmd = 'off' if self.config.divide_mode is 'none' else 'on'
-        outimg.save(os.path.join(self.config.output,
-            '{}_out_expanded_{}_shadow_{}_pmd_{}.{}'.format(
-            self.fname, self.config.expand_width, shadow, pmd, self.fext)))
+        # save output image
+        self._save_output(out)
 
         return out
 
@@ -254,4 +252,21 @@ class GANonymizer:
                 self.debugger.img(res, name)
                 self.debugger.imsave(res, self.fname + '_{}.'.format(name) + self.fext)
             return results
+
+    def _save_output(self, out):
+        # save output image by PIL
+        outimg = Image.fromarray(out)
+        shadow = 'off' if self.config.shadow_mode is 'none' else 'on'
+        pmd = 'off' if self.config.divide_mode is 'none' else 'on'
+        
+        if self.config.evaluate_pmd:
+            savepath = os.path.join(self.config.eval_pmd_path,
+                                    '{}_out_{}.{}'.format(self.fname, pmd, self.fext))
+        else:
+            savepath = os.path.join(self.config.output,
+                                    '{}_out_expanded_{}_shadow_{}_pmd_{}.{}'.format(
+                                        self.fname, self.config.expand_width,
+                                        shadow, pmd, self.fext))
+        outimg.save(savepath)
+
 
