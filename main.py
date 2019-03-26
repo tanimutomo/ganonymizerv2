@@ -3,11 +3,14 @@ import cv2
 import torch
 
 from modules.ganonymizer import GANonymizer
-from modules.utils import Config, Debugger
+from modules.utils import Config, Debugger, create_dir
 
 
 def main(path, config, test=False):
     config = Config(config)
+
+    # create directories
+    path = create_dir(path)
 
     # setup environment
     device = torch.device('cuda:{}'.format(config.cuda)
@@ -49,7 +52,7 @@ if __name__ == '__main__':
             'inpaint_mode': 'pass',
 
             # evaluate pmd
-            'eval_pmd_path': os.path.join(path, 'eval_pmd'),
+            'eval_pmd_path': os.path.join(path, 'pmd'),
             'rmask_min': 100,
             'rmask_max': 400,
 
