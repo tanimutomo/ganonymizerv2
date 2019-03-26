@@ -71,7 +71,7 @@ if __name__ == '__main__':
 
             # pseudo mask division
             'obj_wh_thresh': 120,
-            'obj_density_thresh': 0.6,
+            'obj_density_thresh': 0.4,
 
             # inpaint
             'inpaint': 'EdgeConnect',
