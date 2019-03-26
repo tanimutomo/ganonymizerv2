@@ -46,7 +46,7 @@ class GANonymizer:
 
             # detect shadow area and add shadow area to object mask
             smask, labelmap = self._detect_shadow(img, labelmap)
-            mask = self._combine_masks(img, omask, smask)
+            mask = self._combine_masks(img, omask, smask, labelmap)
 
             # Psuedo Mask Division
             divimg, divmask = self._divide_mask(img, mask, labelmap)
@@ -103,7 +103,7 @@ class GANonymizer:
         out = cv2.resize(img, (new_w, new_h)).astype(np.uint8)
         return out
 
-    def _combine_masks(self, img, omask, smask):
+    def _combine_masks(self, img, omask, smask, labelmap):
         # check omask and smak shape
         assert omask.shape == smask.shape
 
@@ -112,6 +112,14 @@ class GANonymizer:
         mask = expand_mask(mask, self.config.expand_width)
         self.debugger.img(mask, 'Mask (Object Mask + Shadow Mask)')
         self.debugger.imsave(mask, self.fname + '_mask.' + self.fext)
+
+        # expand labelmap
+        for label in range(1, np.max(labelmap)+1):
+            objmap = np.where(labelmap == label, 1, 0)
+            objmap = expand_mask(objmap, self.config.expand_width)
+            objmap = (objmap / 255 * label).astype(np.int32)
+            labelmap = np.where(labelmap == 0, objmap, labelmap)
+        self.debugger.img(labelmap, 'Expanded LabelMap')
 
         # visualization the mask overlayed image
         mask3c = np.stack([mask, np.zeros_like(mask), np.zeros_like(mask)], axis=-1)
