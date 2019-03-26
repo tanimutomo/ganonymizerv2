@@ -56,7 +56,7 @@ def create_dir(path):
                 os.mkdir(os.path.join(dirpath, 'input'))
                 files = os.listdir(dirpath)
                 files = [os.path.join(dirpath, f) for f in files 
-                        if os.path.isfile(os.path.join(dirpath, f))]
+                        if os.path.isfile(os.path.join(dirpath, f)) and f[0] != '.']
                 for f in files:
                     shutil.move(f, os.path.join(dirpath, 'input'))
                 _create_det_dir(dirpath)
@@ -71,7 +71,7 @@ def create_dir(path):
                     os.mkdir(os.path.join(path, 'input'))
                 files = os.listdir(path)
                 files = [os.path.join(path, f) for f in files 
-                        if os.path.isfile(os.path.join(path, f))]
+                        if os.path.isfile(os.path.join(path, f)) and f[0] != '.']
                 for f in files:
                     shutil.move(f, os.path.join(path, 'input'))
                 _create_det_dir(path)
