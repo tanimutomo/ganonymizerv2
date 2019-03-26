@@ -1,11 +1,8 @@
 import os
 import cv2
-import torch
 import pickle
 import numpy as np
 from PIL import Image
-
-from torchvision.transforms import ToTensor, ToPILImage
 
 from .semantic_segmenter import SemanticSegmenter
 from .mask_creater import MaskCreater
@@ -13,7 +10,9 @@ from .object_spliter import ObjectSpliter
 from .shadow_detecter import ShadowDetecter
 from .mask_divider import MaskDivider
 from .inpainter import ImageInpainter
-from .utils import Debugger, label_img_to_color, expand_mask, CreateRandMask
+from .randmask_creater import RandMaskCreater
+from .utils import Debugger, label_img_to_color, expand_mask
+
 
 class GANonymizer:
     def __init__(self, config, device):
@@ -27,6 +26,7 @@ class GANonymizer:
         self.sd = ShadowDetecter(config)
         self.ii = ImageInpainter(config, device)
         self.md = MaskDivider(config, self.ii)
+        self.rm = RandMaskCreater(config)
     
     def predict(self, img_path):
         # loading input image
@@ -45,12 +45,8 @@ class GANonymizer:
         smask, labelmap = self._detect_shadow(img, labelmap)
         mask, labelmap = self._combine_masks(img, omask, smask, labelmap)
 
-        # evaluate the effect of PMD
-        if self.config.evaluate_pmd:
-            rmask_creater = CreateRandMask(self.config.rmask_min,
-                                           self.config.rmask_max)
-            rmask = rmask_creater.sample(mask)
-            labelmap = rmask.copy()
+        # create random mask for evaluate the effect of PMD
+        mask, labelmap = self._random_mask(mask, labelmap)
 
         # Psuedo Mask Division
         divimg, divmask = self._divide_mask(img, mask, labelmap)
@@ -188,8 +184,8 @@ class GANonymizer:
         # pseudo mask division
         print('===== Pseudo Mask Division =====')
         if self.config.divide_mode is 'none':
-            divimg = img
-            divmask = mask
+            divimg = img.copy()
+            divmask = mask.copy()
         else:
             divimg, divmask = self._exec_module(self.config.divide_mode,
                                                 ['divimg', 'divmask'],
@@ -205,8 +201,23 @@ class GANonymizer:
         else:
             inpainted, inpainted_edge, edge = self._exec_module(self.config.inpaint_mode,
                                                                 ['inpaint', 'inpaint_edge', 'edge'],
-                                                                self.ii.inpaint, img, mask)
+                                                                self.ii.inpaint, 
+                                                                img, mask)
         return inpainted
+
+    def _random_mask(self, mask, labelmap):
+        # random mask for evaluating pmd effectness
+        print('===== Create Random Mask =====')
+        if self.config.random_mode is 'none':
+            rmask = mask
+            labelmap = labelmap
+        else:
+            rmask = self._exec_module(self.config.random_mode,
+                                     'rmask',
+                                      self.rm.sample,
+                                      mask)
+            labelmap = rmask.copy()
+        return rmask, labelmap
 
     def _exec_module(self, mode, names, func, *args):
         if isinstance(names, str):
@@ -259,7 +270,7 @@ class GANonymizer:
         shadow = 'off' if self.config.shadow_mode is 'none' else 'on'
         pmd = 'off' if self.config.divide_mode is 'none' else 'on'
         
-        if self.config.evaluate_pmd:
+        if self.config.random_mode is not 'none':
             savepath = os.path.join(self.config.eval_pmd_path,
                                     '{}_out_{}.{}'.format(self.fname, pmd, self.fext))
         else:
