@@ -9,7 +9,7 @@ from skimage.future import graph
 from sklearn.cluster import MeanShift
 from skimage.measure import regionprops
 
-from .utils import Debugger, expand_mask, detect_object, write_labels
+from .utils import Debugger, detect_object, write_labels
 
 
 class ShadowDetecter:
