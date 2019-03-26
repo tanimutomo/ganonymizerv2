@@ -6,23 +6,25 @@ from modules.ganonymizer import GANonymizer
 from modules.utils import Config, Debugger
 
 
-def main(impath, config):
+def main(path, config, test=False):
     config = Config(config)
 
     # setup environment
-    device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda:{}'.format(config.cuda)
+            if torch.cuda.is_available() else 'cpu')
 
     # define the model
     model = GANonymizer(config, device)
 
     # model prediction
-    if type(impath) == str:
-        model.predict(impath)
-    elif type(impath) == list:
-        for path in impath:
-            model.predict(path)
+    if not test:
+        model.predict(path)
     else:
-        raise RuntimeError('impath must be type of str or list object.')
+        inpath = os.path.join(path, 'input')
+        files = os.listdir(inpath)
+        files = [os.path.join(inpath, f) for f in files if os.path.isfile(os.path.join(inpath, f))]
+        for file in files:
+            model.predict(file)
 
 
 if __name__ == '__main__':
@@ -32,19 +34,26 @@ if __name__ == '__main__':
             # execution setting
             'checkpoint': os.path.join(path, 'ckpt'),
             'output': os.path.join(path, 'output'),
+            'cuda': 1,
 
-            # resize
-            'resize_factor': 1,
-        
             # mode (choose in ['pass', 'save', 'exec', 'debug', 'none'])
             'main_mode': 'exec',
             'semseg_mode': 'pass',
             'mask_mode': 'pass',
             'split_mode': 'pass',
             'shadow_mode': 'pass',
+            'random_mode': 'save', # evaluate pmd
             'divide_mode': 'pass',
             'inpaint_mode': 'pass',
 
+            # evaluate pmd
+            'eval_pmd_path': os.path.join(path, 'eval_pmd'),
+            'rmask_min': 100,
+            'rmask_max': 400,
+
+            # resize
+            'resize_factor': 1,
+        
             # segmentation
             'semseg': 'DeepLabV3',
             'resnet': 18,
@@ -76,8 +85,7 @@ if __name__ == '__main__':
             # inpaint
             'inpaint': 'EdgeConnect',
             'inpaint_ckpt': 'modules/edge_connect/checkpoints',
-            'sigma': 2 # for canny edge detection
+            'sigma': 1 # for canny edge detection
             }
     
-    main(impath, config)
-
+    main(impath, config, test=False)
