@@ -46,7 +46,7 @@ class GANonymizer:
 
             # detect shadow area and add shadow area to object mask
             smask, labelmap = self._detect_shadow(img, labelmap)
-            mask = self._combine_masks(img, omask, smask, labelmap)
+            mask, labelmap = self._combine_masks(img, omask, smask, labelmap)
 
             # Psuedo Mask Division
             divimg, divmask = self._divide_mask(img, mask, labelmap)
@@ -133,7 +133,7 @@ class GANonymizer:
         self.debugger.img(img_with_mask, 'Image with Mask')
         self.debugger.imsave(img_with_mask, self.fname + '_img_with_mask.' + self.fext)
 
-        return mask
+        return mask, labelmap
 
     def _semseg(self, img):
         # semantic segmentation
