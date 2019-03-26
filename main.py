@@ -18,12 +18,14 @@ def main(path, config, test=False):
 
     # model prediction
     if not test:
+        print('Loading "{}"'.format(path)) 
         model.predict(path)
     else:
         inpath = os.path.join(path, 'input')
         files = os.listdir(inpath)
         files = [os.path.join(inpath, f) for f in files if os.path.isfile(os.path.join(inpath, f))]
         for file in files:
+            print('Loading "{}"'.format(file)) 
             model.predict(file)
 
 
