@@ -1,6 +1,7 @@
 import os
 import cv2
 import torch
+import shutil
 import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
@@ -38,8 +39,49 @@ def write_labels(img, segmap, size):
         my, mx = np.median(ys).astype(np.int32), np.median(xs).astype(np.int32)
         font = cv2.FONT_HERSHEY_SIMPLEX
         out = cv2.putText(out, str(label), (mx - 10, my), font, size, (0, 255, 255), 1, cv2.LINE_AA)
-
     return out
+
+
+def create_dir(path):
+    if os.path.exists(path):
+        if os.path.isfile(path):
+            dirpath = os.path.dirname(path)
+            rootpath = os.path.dirname(dirpath)
+            print(dirpath, rootpath)
+            if os.path.basename(dirpath) == 'input':
+                print(os.path.basename(dirpath))
+                _create_det_dir(rootpath)
+                return path
+            else:
+                os.mkdir(os.path.join(dirpath, 'input'))
+                files = os.listdir(dirpath)
+                files = [os.path.join(dirpath, f) for f in files 
+                        if os.path.isfile(os.path.join(dirpath, f))]
+                for f in files:
+                    shutil.move(f, os.path.join(dirpath, 'input'))
+                _create_det_dir(dirpath)
+                return os.path.join(dirpath, 'input', os.path.basename(path))
+
+        elif os.path.isdir(path):
+            if os.path.basename(path) == 'input':
+                raise RuntimeError('path should be dataset root '\
+                                   'directory path os an image path')
+            else:
+                if not os.path.exists(os.path.join(path, 'input')):
+                    os.mkdir(os.path.join(path, 'input'))
+                files = os.listdir(path)
+                files = [os.path.join(path, f) for f in files 
+                        if os.path.isfile(os.path.join(path, f))]
+                for f in files:
+                    shutil.move(f, os.path.join(path, 'input'))
+                _create_det_dir(path)
+                return path
+
+
+def _create_det_dir(rootpath):
+    for name in ['ckpt', 'output', 'pmd']:
+        if not os.path.exists(os.path.join(rootpath, name)):
+            os.mkdir(os.path.join(rootpath, name))
 
 
 class Config(dict):
