@@ -42,6 +42,28 @@ def write_labels(img, segmap, size):
     return out
 
 
+def pmd_mode_change(config, pmd):
+    if pmd == 'on':
+        config.main_mode = 'exec'
+        config.semseg_mode = 'save'
+        config.mask_mode = 'save'
+        config.split_mode = 'save'
+        config.shadow_mode = 'save'
+        config.random_mode = 'save'
+        config.divide_mode = 'exec'
+        config.inpaint_mode = 'exec'
+    elif pmd == 'off':
+        config.main_mode = 'exec'
+        config.semseg_mode = 'pass'
+        config.mask_mode = 'pass'
+        config.split_mode = 'pass'
+        config.shadow_mode = 'pass'
+        config.random_mode = 'pass'
+        config.divide_mode = 'exec'
+        config.inpaint_mode = 'exec'
+    return config
+
+
 def create_dir(path):
     if os.path.exists(path):
         if os.path.isfile(path):
