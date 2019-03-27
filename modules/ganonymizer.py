@@ -32,7 +32,6 @@ class GANonymizer:
         self.config = config
     
     def predict(self, img_path):
-        print('random_mode:', config.random_mode)
         # loading input image
         img = self._load_img(img_path)
 
