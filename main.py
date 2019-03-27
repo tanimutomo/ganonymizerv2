@@ -16,10 +16,11 @@ def main(path, config):
     device = torch.device('cuda:{}'.format(config.cuda)
             if torch.cuda.is_available() else 'cpu')
 
+    # define the model
+    model = GANonymizer(config, device)
+
     if config.mode == 'img':
         print('Loading "{}"'.format(path)) 
-        # define the model
-        model = GANonymizer(config, device)
         # model prediction
         model.predict(path)
 
@@ -30,8 +31,6 @@ def main(path, config):
                 if os.path.isfile(os.path.join(inpath, f)) and f[0] != '.']
         for f in files:
             print('Loading "{}"'.format(f)) 
-            # define the model
-            model = GANonymizer(config, device)
             model.predict(f)
 
     elif config.mode == 'pmd':
@@ -44,14 +43,12 @@ def main(path, config):
 
             # with pmd
             config = pmd_mode_change(config, 'on')
-            # define the model
-            model = GANonymizer(config, device)
+            model.reload_config(config)
             out_on = model.predict(f)
             
             # without pmd
             config = pmd_mode_change(config, 'off')
-            # define the model
-            model = GANonymizer(config, device)
+            model.reload_config(config)
             out_off = model.predict(f)
 
             # calcurate psnr and ssim

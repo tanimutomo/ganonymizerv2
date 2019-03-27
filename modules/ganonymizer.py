@@ -27,8 +27,12 @@ class GANonymizer:
         self.ii = ImageInpainter(config, device)
         self.md = MaskDivider(config, self.ii)
         self.rm = RandMaskCreater(config)
+
+    def reload_config(self, config):
+        self.config = config
     
     def predict(self, img_path):
+        print('random_mode:', config.random_mode)
         # loading input image
         img = self._load_img(img_path)
 
