@@ -152,7 +152,8 @@ class MaskDivider:
 
                 # create lattice mask image
                 lattice = np.zeros_like(obj['mask']).astype(np.uint8)
-                vline_w, hline_w = int(w / 16), int(h / 16)
+                vline_w = int(w / self.config.line_width_div)
+                hline_w = int(h / self.config.line_width_div)
                 self.debugger.param(vline_w, 'vline width')
                 self.debugger.param(hline_w, 'hline width')
                 # draw vertical line
