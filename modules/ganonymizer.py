@@ -274,7 +274,7 @@ class GANonymizer:
         shadow = 'off' if self.config.shadow_mode is 'none' else 'on'
         pmd = 'off' if self.config.divide_mode is 'none' else 'on'
         
-        if self.config.random_mode is not 'none':
+        if self.config.mode == 'pmd':
             savepath = os.path.join(self.config.eval_pmd_path,
                                     '{}_out_{}.{}'.format(self.fname, pmd, self.fext))
         else:

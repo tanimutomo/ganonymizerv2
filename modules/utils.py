@@ -59,7 +59,7 @@ def pmd_mode_change(config, pmd):
         config.split_mode = 'pass'
         config.shadow_mode = 'pass'
         config.random_mode = 'pass'
-        config.divide_mode = 'exec'
+        config.divide_mode = 'none'
         config.inpaint_mode = 'exec'
     return config
 
