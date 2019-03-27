@@ -75,7 +75,7 @@ if __name__ == '__main__':
             'mask_mode': 'pass',
             'split_mode': 'pass',
             'shadow_mode': 'pass',
-            'random_mode': 'save', # evaluate pmd
+            'random_mode': 'pass', # evaluate pmd
             'divide_mode': 'pass',
             'inpaint_mode': 'pass',
 
@@ -121,4 +121,4 @@ if __name__ == '__main__':
             'sigma': 1 # for canny edge detection
             }
     
-    main(impath, config)
+    main(path, config)
