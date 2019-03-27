@@ -3,10 +3,10 @@ import cv2
 import torch
 
 from modules.ganonymizer import GANonymizer
-from modules.utils import Config, Debugger, create_dir
+from modules.utils import Config, Debugger, create_dir, pmd_mode_change
 
 
-def main(path, config, test=False):
+def main(path, config):
     config = Config(config)
 
     # create directories
@@ -16,21 +16,46 @@ def main(path, config, test=False):
     device = torch.device('cuda:{}'.format(config.cuda)
             if torch.cuda.is_available() else 'cpu')
 
-    # define the model
-    model = GANonymizer(config, device)
-
-    # model prediction
-    if not test:
+    if config.mode == 'img':
         print('Loading "{}"'.format(path)) 
+        # define the model
+        model = GANonymizer(config, device)
+        # model prediction
         model.predict(path)
-    else:
+
+    elif config.mode == 'dir':
         inpath = os.path.join(path, 'input')
         files = os.listdir(inpath)
         files = [os.path.join(inpath, f) for f in files 
                 if os.path.isfile(os.path.join(inpath, f)) and f[0] != '.']
-        for file in files:
-            print('Loading "{}"'.format(file)) 
-            model.predict(file)
+        for f in files:
+            print('Loading "{}"'.format(f)) 
+            # define the model
+            model = GANonymizer(config, device)
+            model.predict(f)
+
+    elif config.mode == 'pmd':
+        inpath = os.path.join(path, 'input')
+        files = os.listdir(inpath)
+        files = [os.path.join(inpath, f) for f in files 
+                if os.path.isfile(os.path.join(inpath, f)) and f[0] != '.']
+        for f in files:
+            print('Loading "{}"'.format(f)) 
+
+            # with pmd
+            config = pmd_mode_change(config, 'on')
+            # define the model
+            model = GANonymizer(config, device)
+            out_on = model.predict(f)
+            
+            # without pmd
+            config = pmd_mode_change(config, 'off')
+            # define the model
+            model = GANonymizer(config, device)
+            out_off = model.predict(f)
+
+            # calcurate psnr and ssim
+
 
 
 if __name__ == '__main__':
@@ -38,11 +63,13 @@ if __name__ == '__main__':
     impath = os.path.join(path, 'input', 'frankfurt_000000_000576_leftImg8bit.png')
     config = {
             # execution setting
+            # mode should be choosen from ['img', 'dir', 'pmd']
+            'mode': 'pmd',
             'checkpoint': os.path.join(path, 'ckpt'),
             'output': os.path.join(path, 'output'),
             'cuda': 1,
 
-            # mode (choose in ['pass', 'save', 'exec', 'debug', 'none'])
+            # *_mode (choose in ['pass', 'save', 'exec', 'debug', 'none'])
             'main_mode': 'exec',
             'semseg_mode': 'pass',
             'mask_mode': 'pass',
@@ -94,4 +121,4 @@ if __name__ == '__main__':
             'sigma': 1 # for canny edge detection
             }
     
-    main(impath, config, test=False)
+    main(impath, config)
