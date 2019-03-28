@@ -42,6 +42,26 @@ def write_labels(img, segmap, size):
     return out
 
 
+def bar_plot(gray, label, comment, cluster=None):
+    print('-'*10, comment, '-'*10)
+    plt.figure(figsize=(10, 10), dpi=200)
+    if cluster is None:
+        plt.bar(np.arange(gray.shape[0]), gray,
+                tick_label=label, align='center')
+    else:
+        color = flatten([['r', 'g', 'b', 'c', 'm', 'y'] for _ in range(100)])
+        bar_color = [color[c] for c in cluster]
+        plt.bar(np.arange(gray.shape[0]), gray,
+                color=bar_color, tick_label=label, align='center')
+    plt.show()
+    print('-' * (len(comment) + 22))
+
+
+def flatten(nested_list):
+    """2重のリストをフラットにする関数"""
+    return [e for inner_list in nested_list for e in inner_list]
+
+
 def pmd_mode_change(config, pmd):
     if pmd == 'on':
         config.main_mode = 'exec'

@@ -9,7 +9,7 @@ from skimage.future import graph
 from sklearn.cluster import MeanShift
 from skimage.measure import regionprops
 
-from .utils import Debugger, detect_object, write_labels
+from .utils import Debugger, detect_object, write_labels, bar_plot
 
 
 class ShadowDetecter:
@@ -147,6 +147,8 @@ class ShadowDetecter:
         self.debugger.param(counter, 'Segment Count for each Cluster')
         clst_mean = self._cluster_mean(cluster, gray)
         self.debugger.param(clst_mean, 'Cluster Color Mean')
+        if self.config.shadow_mode == 'debug':
+            bar_plot(gray, label, 'Cluster Gray Median Distribution', cluster)
 
         # get the lowest mean cluster as shadow cluster
         shadow_clst, most_color = self._get_shadow_cluster(cluster, clst_mean, counter)
@@ -171,8 +173,10 @@ class ShadowDetecter:
     def _add_all_ss(self, img, segmap, ss_labels, most_color):
         vis = mark_boundaries(img, segmap)
         self.debugger.matrix(ss_labels, 'Shadow Segment Labels')
-        self.debugger.img(write_labels(img, segmap, 0.3),
+        self.debugger.img(mark_boundaries(img, segmap),
                 'Image with Segmap Label')
+        self.debugger.img(write_labels(img, segmap, 0.3),
+                'Image with Segmap Label with Segment Label')
 
         # create rag
         G = graph.rag_mean_color(img, segmap, mode='similarity')
@@ -370,9 +374,7 @@ class ShadowDetecter:
         order = np.argsort(gray)
         gray, label = gray[order], label[order]
         if self.config.shadow_mode == 'debug':
-            plt.figure(figsize=(10, 10), dpi=200)
-            plt.bar(np.arange(gray.shape[0]), gray,
-                tick_label=label, align='center')
+            bar_plot(gray, label, 'Cluster Gray Median Distribution')
         return label, gray
 
     def _extract_bot_segment(self, img, segmap, point_img):
@@ -396,6 +398,8 @@ class ShadowDetecter:
 
         # visualize segment label in the image
         self.debugger.img(write_labels(img, bot_segmap, 0.3),
+                'Image with Segmap Label with Segment Label')
+        self.debugger.img(mark_boundaries(img, bot_segmap),
                 'Image with Segmap Label')
 
         return bot_segmap, label_mcolor
