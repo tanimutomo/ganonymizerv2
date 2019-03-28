@@ -215,11 +215,10 @@ class GANonymizer:
             rmask = mask
             labelmap = labelmap
         else:
-            rmask = self._exec_module(self.config.random_mode,
-                                     'rmask',
-                                      self.rm.sample,
-                                      mask)
-            labelmap = rmask.copy()
+            rmask, labelmap = self._exec_module(self.config.random_mode,
+                                                'rmask',
+                                                self.rm.sample,
+                                                mask)
         return rmask, labelmap
 
     def _exec_module(self, mode, names, func, *args):
