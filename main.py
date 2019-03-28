@@ -78,8 +78,9 @@ if __name__ == '__main__':
 
             # evaluate pmd
             'eval_pmd_path': os.path.join(path, 'pmd'),
-            'rmask_min': 100,
+            'rmask_min': 200,
             'rmask_max': 400,
+            'rmask_shape': 'rectangle',
 
             # resize
             'resize_factor': 1,
