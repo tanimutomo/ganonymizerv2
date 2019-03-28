@@ -13,6 +13,9 @@ class MaskDivider:
         self.inpainter = inpainter
 
     def divide(self, img, mask, labelmap, fname, fext):
+        if np.sum(mask) == 0:
+            return img, mask
+
         # get large object
         objects = self._classify_object(labelmap)
 
