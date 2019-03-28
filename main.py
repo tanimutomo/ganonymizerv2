@@ -64,7 +64,7 @@ if __name__ == '__main__':
             'mode': 'pmd',
             'checkpoint': os.path.join(path, 'ckpt'),
             'output': os.path.join(path, 'output'),
-            'cuda': 1,
+            'cuda': 0,
 
             # *_mode (choose in ['pass', 'save', 'exec', 'debug', 'none'])
             'main_mode': 'exec',
@@ -110,6 +110,8 @@ if __name__ == '__main__':
             'sc_color_thresh': 1.5,
 
             # pseudo mask division
+            # pmd mode is choosen from ['all', 'lattice']
+            'pmd': 'all',
             'obj_wh_thresh': 120,
             'obj_density_thresh': 0.4,
             'line_width_div': 8,

@@ -148,50 +148,59 @@ class MaskDivider:
             # don't apply to small object
             if obj['large']:
                 self.debugger.img(obj['mask'], 'check object')
-                x, y, _, _ = obj['box']
-                h, w = obj['height'], obj['width']
-                self.debugger.param(h, 'height')
-                self.debugger.param(w, 'width')
+                if self.config.pmd == 'all':
+                    objmask3c = np.stack([obj['mask'] for _ in range(3)],
+                                         axis=-1).astype(np.uint8)
+                    # insert inpainted image to lattice part in black image
+                    imglat = np.where(objmask3c == 1, obj['inpainted'], objmask3c)
+                    # insert this object mask image to not lattice part in black image
+                    masklat = np.zeros_like(obj['mask']).astype(np.uint8)
 
-                # create lattice mask image
-                lattice = np.zeros_like(obj['mask']).astype(np.uint8)
-                vline_w = int(w / self.config.line_width_div)
-                hline_w = int(h / self.config.line_width_div)
-                self.debugger.param(vline_w, 'vline width')
-                self.debugger.param(hline_w, 'hline width')
-                # draw vertical line
-                lattice = cv2.line(lattice,
-                        (x + int(w * (5/16)), y + int(h * (1/8))),
-                        (x + int(w * (5/16)), y + int(h * (7/8))),
-                        1, vline_w)
-                lattice = cv2.line(lattice,
-                        (x + int(w * (11/16)), y + int(h * (1/8))),
-                        (x + int(w * (11/16)), y + int(h * (7/8))),
-                        1, vline_w)
-                # draw horizontal line
-                lattice = cv2.line(lattice,
-                        (x + int(w * (1/8)), y + int(h * (5/16))),
-                        (x + int(w * (7/8)), y + int(h * (5/16))),
-                        1, hline_w)
-                lattice = cv2.line(lattice,
-                        (x + int(w * (1/8)), y + int(h * (11/16))),
-                        (x + int(w * (7/8)), y + int(h * (11/16))),
-                        1, hline_w)
+                elif self.config.pmd == 'lattice':
+                    x, y, _, _ = obj['box']
+                    h, w = obj['height'], obj['width']
+                    self.debugger.param(h, 'height')
+                    self.debugger.param(w, 'width')
 
-                lattice = np.where(obj['mask'] == 1, lattice, 0)
-                self.debugger.img(lattice, 'lattice image')
-                lattice3c = np.stack([lattice for _ in range(3)], axis=-1).astype(np.uint8)
-                # insert inpainted image to lattice part in black image
-                imglat = np.where(lattice3c == 1, obj['inpainted'], lattice3c)
-                # insert this object mask image to not lattice part in black image
-                masklat = np.where(lattice == 1, 0, obj['mask'])
+                    # create lattice mask image
+                    lattice = np.zeros_like(obj['mask']).astype(np.uint8)
+                    vline_w = int(w / self.config.line_width_div)
+                    hline_w = int(h / self.config.line_width_div)
+                    self.debugger.param(vline_w, 'vline width')
+                    self.debugger.param(hline_w, 'hline width')
+                    # draw vertical line
+                    lattice = cv2.line(lattice,
+                            (x + int(w * (5/16)), y + int(h * (1/8))),
+                            (x + int(w * (5/16)), y + int(h * (7/8))),
+                            1, vline_w)
+                    lattice = cv2.line(lattice,
+                            (x + int(w * (11/16)), y + int(h * (1/8))),
+                            (x + int(w * (11/16)), y + int(h * (7/8))),
+                            1, vline_w)
+                    # draw horizontal line
+                    lattice = cv2.line(lattice,
+                            (x + int(w * (1/8)), y + int(h * (5/16))),
+                            (x + int(w * (7/8)), y + int(h * (5/16))),
+                            1, hline_w)
+                    lattice = cv2.line(lattice,
+                            (x + int(w * (1/8)), y + int(h * (11/16))),
+                            (x + int(w * (7/8)), y + int(h * (11/16))),
+                            1, hline_w)
+
+                    lattice = np.where(obj['mask'] == 1, lattice, 0)
+                    self.debugger.img(lattice, 'lattice image')
+                    lattice3c = np.stack([lattice for _ in range(3)], axis=-1).astype(np.uint8)
+                    # insert inpainted image to lattice part in black image
+                    imglat = np.where(lattice3c == 1, obj['inpainted'], lattice3c)
+                    # insert this object mask image to not lattice part in black image
+                    masklat = np.where(lattice == 1, 0, obj['mask'])
 
             else:
                 imglat = np.zeros_like(img)
                 masklat = obj['mask']
 
-            self.debugger.img(imglat, 'lattice image')
-            self.debugger.img(masklat, 'lattice mask')
+            self.debugger.img(imglat, '{} image'.format(self.config.pmd))
+            self.debugger.img(masklat, '{} mask'.format(self.config.pmd))
 
             # unite all object lattice part image
             if idx == 0:
