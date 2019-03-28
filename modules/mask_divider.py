@@ -2,6 +2,7 @@ import os
 import cv2
 import numpy as np
 from PIL import Image
+from scipy import ndimage
 
 from .utils import Debugger, detect_object, write_labels
 
@@ -155,6 +156,17 @@ class MaskDivider:
                     imglat = np.where(objmask3c == 1, obj['inpainted'], objmask3c)
                     # insert this object mask image to not lattice part in black image
                     masklat = np.zeros_like(obj['mask']).astype(np.uint8)
+
+                elif self.config.pmd == 'center':
+                    objmask = np.where(obj['mask'] > 0, 1, 0).astype(np.bool)
+                    distance = ndimage.distance_transform_edt(objmask)
+                    objmask = np.where(distance >= self.config.distance, 1, 0)
+                    objmask3c = np.stack(objmask for _ in range(3)],
+                                         axis=-1).astype(np.uint8)
+                    # insert inpainted image to lattice part in black image
+                    imglat = np.where(objmask3c == 1, obj['inpainted'], objmask3c)
+                    # insert this object mask image to not lattice part in black image
+                    masklat = np.where(objmask == 1, 0, obj['mask'])
 
                 elif self.config.pmd == 'lattice':
                     x, y, _, _ = obj['box']

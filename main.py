@@ -110,11 +110,12 @@ if __name__ == '__main__':
             'sc_color_thresh': 1.5,
 
             # pseudo mask division
-            # pmd mode is choosen from ['all', 'lattice']
+            # pmd mode is choosen from ['all', 'lattice', 'center']
             'pmd': 'all',
             'obj_wh_thresh': 120,
             'obj_density_thresh': 0.4,
             'line_width_div': 8,
+            'distance': 20,
 
             # inpaint
             'inpaint': 'EdgeConnect',
