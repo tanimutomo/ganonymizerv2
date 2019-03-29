@@ -99,6 +99,8 @@ class ObjectSpliter:
 
             # the case that object is Separated to the edge of the image
             if all_contours[0].shape[0] == labelmap.shape[0]*2 + labelmap.shape[1]*2 - 4:
+                if len(all_contours) == 1: 
+                    continue
                 contours = all_contours[1].squeeze().transpose()
                 inside = all_contours[2:]
             # the case that object is Adjust to the edge of the image
