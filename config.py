@@ -1,0 +1,67 @@
+import os 
+def get_config(path):
+    config = {
+            # execution setting
+            # mode should be choosen from ['img', 'dir', 'pmd']
+            'mode': 'img',
+            'checkpoint': os.path.join(path, 'ckpt'),
+            'output': os.path.join(path, 'output'),
+            'cuda': 0,
+
+            # *_mode (choose in ['pass', 'save', 'exec', 'debug', 'none'])
+            'main_mode': 'save',
+            'semseg_mode': 'save',
+            'mask_mode': 'save',
+            'split_mode': 'debug',
+            'shadow_mode': 'save',
+            'random_mode': 'save', # evaluate pmd
+            'divide_mode': 'save',
+            'inpaint_mode': 'save',
+
+            # evaluate pmd
+            'eval_pmd_path': os.path.join(path, 'pmd'),
+            'rmask_min': 200,
+            'rmask_max': 400,
+            'rmask_shape': 'rectangle',
+
+            # resize
+            'resize_factor': 1,
+        
+            # segmentation
+            'semseg': 'DeepLabV3',
+            'resnet': 18,
+
+            # mask
+            'mask': 'entire',
+            'expand_width': 6,
+            # separate
+            'crop_rate': 0.5,
+            
+            # separate mask to each object
+            'fill_hole': 'later',
+            'obj_sml_thresh': 1e-3, # this param is also used in shadow detection
+            'obj_sep_thresh': 1/3,
+
+            # shadow detection
+            'obj_high_thresh': 0.2,
+            'superpixel': 'quickshift',
+            'shadow_high_thresh': 0.01,
+            'alw_range_max': 15,
+            'find_iteration': 3,
+            'ss_score_thresh': 4,
+            'sc_color_thresh': 1.5,
+
+            # pseudo mask division
+            # pmd mode is choosen from ['all', 'lattice', 'center']
+            'pmd': 'all',
+            'obj_wh_thresh': 120,
+            'obj_density_thresh': 0.4,
+            'line_width_div': 8,
+            'distance': 20,
+
+            # inpaint
+            'inpaint': 'EdgeConnect',
+            'inpaint_ckpt': 'modules/edge_connect/checkpoints',
+            'sigma': 2 # for canny edge detection
+            }
+    return config
