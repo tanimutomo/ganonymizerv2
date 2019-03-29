@@ -168,6 +168,20 @@ class MaskDivider:
                     # insert this object mask image to not lattice part in black image
                     masklat = np.where(objmask == 1, 0, obj['mask'])
 
+                elif self.config.pmd == 'dprob':
+                    objmask = np.where(obj['mask'] > 0, 1, 0).astype(np.bool)
+                    distance = ndimage.distance_transform_edt(objmask)
+                    maxd = np.max(distance)
+                    probmask = distance / maxd
+                    randmask = np.random.rand(objmask.shape[0], objmask.shape[1]).astype(np.float64)
+                    activemask = np.where(probmask + randmask >= 1, 1, 0).astype(np.uint8)
+                    activemask3c = np.stack([activemask for _ in range(3)],
+                                         axis=-1).astype(np.uint8)
+                    # insert inpainted image to lattice part in black image
+                    imglat = np.where(activemask3c == 1, obj['inpainted'], activemask3c)
+                    # insert this object mask image to not lattice part in black image
+                    masklat = np.where(activemask == 1, 0, obj['mask'])
+
                 elif self.config.pmd == 'lattice':
                     x, y, _, _ = obj['box']
                     h, w = obj['height'], obj['width']

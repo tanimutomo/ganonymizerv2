@@ -10,8 +10,8 @@ def get_config(path):
 
             # *_mode (choose in ['pass', 'save', 'exec', 'debug', 'none'])
             'main_mode': 'save',
-            'semseg_mode': 'save',
-            'mask_mode': 'save',
+            'semseg_mode': 'pass',
+            'mask_mode': 'pass',
             'split_mode': 'debug',
             'shadow_mode': 'save',
             'random_mode': 'save', # evaluate pmd
@@ -52,7 +52,7 @@ def get_config(path):
             'sc_color_thresh': 1.5,
 
             # pseudo mask division
-            # pmd mode is choosen from ['all', 'lattice', 'center']
+            # pmd mode is choosen from ['all', 'lattice', 'center', 'dprob']
             'pmd': 'all',
             'obj_wh_thresh': 120,
             'obj_density_thresh': 0.4,
