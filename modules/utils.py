@@ -1,6 +1,7 @@
 import os
 import cv2
 import torch
+import shutil
 import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
@@ -14,11 +15,12 @@ def tensor_img_to_numpy(tensor):
     return array
 
 
-def detect_object(img):
-    num, label_map, stats, _ = cv2.connectedComponentsWithStats(img)
+def detect_object(img, debugger):
+    num, labelmap, stats, _ = cv2.connectedComponentsWithStats(img)
+    debugger.img(labelmap, 'labelmap')
     # stat is [tl_x, tl_y, w, h, area]
     label_list = [i+1 for i in range(num - 1)]
-    return label_map, stats[1:], label_list
+    return labelmap, stats[1:], label_list
 
 
 def expand_mask(mask, width):
@@ -37,8 +39,91 @@ def write_labels(img, segmap, size):
         my, mx = np.median(ys).astype(np.int32), np.median(xs).astype(np.int32)
         font = cv2.FONT_HERSHEY_SIMPLEX
         out = cv2.putText(out, str(label), (mx - 10, my), font, size, (0, 255, 255), 1, cv2.LINE_AA)
-
     return out
+
+
+def bar_plot(gray, label, comment, cluster=None):
+    print('-'*10, comment, '-'*10)
+    plt.figure(figsize=(10, 10), dpi=200)
+    if cluster is None:
+        plt.bar(np.arange(gray.shape[0]), gray,
+                tick_label=label, align='center')
+    else:
+        color = flatten([['r', 'g', 'b', 'c', 'm', 'y'] for _ in range(100)])
+        bar_color = [color[c] for c in cluster]
+        plt.bar(np.arange(gray.shape[0]), gray,
+                color=bar_color, tick_label=label, align='center')
+    plt.show()
+    print('-' * (len(comment) + 22))
+
+
+def flatten(nested_list):
+    """2重のリストをフラットにする関数"""
+    return [e for inner_list in nested_list for e in inner_list]
+
+
+def pmd_mode_change(config, pmd):
+    if pmd == 'on':
+        config.main_mode = 'exec'
+        config.semseg_mode = 'save'
+        config.mask_mode = 'save'
+        config.split_mode = 'save'
+        config.shadow_mode = 'save'
+        config.random_mode = 'save'
+        config.divide_mode = 'exec'
+        config.inpaint_mode = 'exec'
+    elif pmd == 'off':
+        config.main_mode = 'exec'
+        config.semseg_mode = 'pass'
+        config.mask_mode = 'pass'
+        config.split_mode = 'pass'
+        config.shadow_mode = 'pass'
+        config.random_mode = 'pass'
+        config.divide_mode = 'none'
+        config.inpaint_mode = 'exec'
+    return config
+
+
+def create_dir(path):
+    if os.path.exists(path):
+        if os.path.isfile(path):
+            dirpath = os.path.dirname(path)
+            rootpath = os.path.dirname(dirpath)
+            print(dirpath, rootpath)
+            if os.path.basename(dirpath) == 'input':
+                print(os.path.basename(dirpath))
+                _create_det_dir(rootpath)
+                return path
+            else:
+                os.mkdir(os.path.join(dirpath, 'input'))
+                files = os.listdir(dirpath)
+                files = [os.path.join(dirpath, f) for f in files 
+                        if os.path.isfile(os.path.join(dirpath, f)) and f[0] != '.']
+                for f in files:
+                    shutil.move(f, os.path.join(dirpath, 'input'))
+                _create_det_dir(dirpath)
+                return os.path.join(dirpath, 'input', os.path.basename(path))
+
+        elif os.path.isdir(path):
+            if os.path.basename(path) == 'input':
+                raise RuntimeError('path should be dataset root '\
+                                   'directory path os an image path')
+            else:
+                if not os.path.exists(os.path.join(path, 'input')):
+                    os.mkdir(os.path.join(path, 'input'))
+                files = os.listdir(path)
+                files = [os.path.join(path, f) for f in files 
+                        if os.path.isfile(os.path.join(path, f)) and f[0] != '.']
+                for f in files:
+                    shutil.move(f, os.path.join(path, 'input'))
+                _create_det_dir(path)
+                return path
+
+
+def _create_det_dir(rootpath):
+    for name in ['ckpt', 'output', 'pmd']:
+        if not os.path.exists(os.path.join(rootpath, name)):
+            os.mkdir(os.path.join(rootpath, name))
 
 
 class Config(dict):

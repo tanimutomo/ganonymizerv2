@@ -3,10 +3,6 @@ import cv2
 import numpy as np
 from PIL import Image
 from scipy import ndimage
-from collections import Counter
-from skimage.morphology import label
-from skimage.feature import peak_local_max
-from skimage.segmentation import random_walker, relabel_sequential
 
 from .utils import Debugger, detect_object, write_labels
 
@@ -17,15 +13,9 @@ class MaskDivider:
         self.debugger = Debugger(config.divide_mode, save_dir=config.checkpoint)
         self.inpainter = inpainter
 
-    def divide(self, img, mask, fname, fext):
-        # separate object in the mask using random walker algorithm
-        labelmap = self._separate_objects(mask)
-
-        # restore missing objects
-        labelmap = self._restore_missings(labelmap, mask)
-
-        # integrate separted small objects into big one
-        labelmap = self._remove_sml_obj(labelmap)
+    def divide(self, img, mask, labelmap, fname, fext):
+        if np.sum(mask) == 0:
+            return img, mask
 
         # get large object
         objects = self._classify_object(labelmap)
@@ -38,116 +28,6 @@ class MaskDivider:
 
         return new_img, new_mask
 
-    def _separate_objects(self, mask):
-        # separate object in the mask using random walker algorithm
-        # In obj_labelmap, -1 is background, 0 is none, object is from 1
-        mask = np.where(mask > 0, 1, 0).astype(np.bool)
-
-        ksize = int((mask.shape[0] + mask.shape[1]) / 30)
-        distance = ndimage.distance_transform_edt(mask)
-        local_maxi = peak_local_max(distance, indices=False, 
-                footprint=np.ones((ksize, ksize)), labels=mask)
-        markers = label(local_maxi)
-        markers[~mask] = -1
-        labelmap = random_walker(mask, markers)
-        
-        labelmap = np.where(labelmap < 0, 0, labelmap)
-        self.debugger.img(labelmap, 'labelmap')
-
-        return labelmap
-
-    def _restore_missings(self, labelmap, mask):
-        lmax = np.max(labelmap)
-        self.debugger.param(lmax, 'max value of label')
-        self.debugger.param(labelmap, 'labelmap')
-        labeled = np.where(labelmap > 0, 1, 0).astype(np.int32)
-        mask = np.where(mask > 0, 1, 0).astype(np.int32)
-        unlabeled = mask - labeled
-        self.debugger.img(unlabeled, 'unlabeled')
-        unlabeled_map, _, labels = detect_object(unlabeled.astype(np.uint8))
-        for label in labels:
-            self.debugger.param(label, 'label number')
-            obj = np.where(unlabeled_map == label, lmax + label, 0).astype(labelmap.dtype)
-            self.debugger.param(label, 'old label')
-            self.debugger.param(np.max(obj), 'new label')
-            self.debugger.img(obj, 'object')
-            labelmap += obj
-
-        self.debugger.img(labelmap, 'restored labelmap')
-        self.debugger.img(write_labels(labelmap, labelmap, 1),
-                'restored labelmap with label number')
-        return labelmap
-
-    def _remove_sml_obj(self, obj_labelmap):
-        # integrate separted small objects into big one
-
-        removed_labels = []
-        # start from object label 1 (0 is not object)
-        for label in range(1, np.max(obj_labelmap) + 1):
-            self.debugger.param(label, 'label number')
-            # create each object mask
-            objmap = np.where(obj_labelmap == label, 1, 0).astype(np.uint8)
-            objmap_wb = np.where(objmap == 1, 0, 1).astype(np.uint8)
-            # self.debugger.img(objmap, 'object map')
-            self.debugger.img(objmap_wb, 'object map (white blob)')
-            
-            # calcurate area of the object
-            area = np.sum(objmap)
-
-            # object size filter if an object is bigger than threshl, the following process is passed
-            if area > obj_labelmap.shape[0] * obj_labelmap.shape[1] * self.config.obj_sml_thresh: continue
-
-            # get contours(x, y) of the object
-            try:
-                contours, _ = cv2.findContours(objmap_wb, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-                self.debugger.matrix(contours[1], 'contours')
-            except:
-                continue
-
-            contours = contours[1].squeeze().transpose()
-
-            # if object is located in the image edge, remove image edge point from contours
-            if contours.shape[1] >= obj_labelmap.shape[0] * 2 + obj_labelmap.shape[1] * 2:
-                self.debugger.matrix(contours, 'before contours')
-                for value in [0, obj_labelmap.shape[0] - 1, obj_labelmap.shape[1] - 1]:
-                    contours = np.where(contours == value, -1, contours)
-                self.debugger.matrix(np.where(contours[0] == -1)[0], '0 delete index')
-                self.debugger.matrix(np.where(contours[1] == -1)[0], '0 delete index')
-                delidx = np.unique(np.concatenate([np.where(contours[0] == -1)[0],
-                    np.where(contours[1] == -1)[0]]))
-                self.debugger.matrix(delidx, 'delete index')
-                contours = np.delete(contours, delidx, axis=-1)
-                self.debugger.matrix(contours, 'after contours')
-
-            # detect surrounding object label
-            self.debugger.matrix(contours, 'aranged contours')
-            sur_labels = obj_labelmap[contours[1], contours[0]]
-            self.debugger.matrix(sur_labels, 'surrounding labels')
-
-            # delete 0 label (background) from surrounding labels
-            sur_labels = np.delete(sur_labels, np.where(sur_labels == 0)[0])
-
-            # if all surrounding labels is 0, the following process is passed
-            if sur_labels.size == 0: continue
-
-            # calcurate most labels in surroundings
-            self.debugger.matrix(sur_labels, 'deleted 0 sur_labels')
-            label_count = Counter(sur_labels.tolist())
-            most_sur_label = max(label_count, key=label_count.get)
-            self.debugger.param(most_sur_label, 'most surrounding label')
-
-            # integrate this label object into most surrounding label
-            obj_labelmap = np.where(obj_labelmap == label, most_sur_label, obj_labelmap)
-            removed_labels.append(label)
-
-        # make labels order sequential
-        for label in removed_labels:
-            obj_labelmap = np.where(obj_labelmap > label, obj_labelmap - 1, obj_labelmap)
-
-        self.debugger.img(obj_labelmap, 'output of object label map')
-        self.debugger.img(write_labels(obj_labelmap, obj_labelmap, 1),
-                'removed small object labelmap')
-        return obj_labelmap
 
     def _classify_object(self, labelmap):
         objects = []
@@ -228,21 +108,21 @@ class MaskDivider:
             self.debugger.img(resmask, 'resized mask')
 
             # apply inpainting
-            paths = [
-                    os.path.join(self.config.checkpoint, fname + '_{}_sml_inp.'.format(idx) + fext),
-                    os.path.join(self.config.checkpoint, fname + '_{}_sml_inpe.'.format(idx) + fext),
-                    os.path.join(self.config.checkpoint, fname + '_{}_sml_edge.'.format(idx) + fext)
-                    ]
-            self.debugger.param(paths, 'paths')
-            if os.path.exists(paths[0]) and self.debugger.mode != 'debug':
-                inpainted = np.array(Image.open(paths[0]))
-                inpainted_edge = np.array(Image.open(paths[1]))
-                edge = np.array(Image.open(paths[2]))
-            else:
-                inpainted, inpainted_edge, edge = self.inpainter.inpaint(resimg, resmask) 
-                Image.fromarray(inpainted).save(paths[0])
-                Image.fromarray(inpainted_edge).save(paths[1])
-                Image.fromarray(edge).save(paths[2])
+            # paths = [
+            #         os.path.join(self.config.checkpoint, fname + '_{}_sml_inp.'.format(idx) + fext),
+            #         os.path.join(self.config.checkpoint, fname + '_{}_sml_inpe.'.format(idx) + fext),
+            #         os.path.join(self.config.checkpoint, fname + '_{}_sml_edge.'.format(idx) + fext)
+            #         ]
+            # self.debugger.param(paths, 'paths')
+            # if os.path.exists(paths[0]) and self.debugger.mode != 'debug':
+            #     inpainted = np.array(Image.open(paths[0]))
+            #     inpainted_edge = np.array(Image.open(paths[1]))
+            #     edge = np.array(Image.open(paths[2]))
+            # else:
+            inpainted, inpainted_edge, edge = self.inpainter.inpaint(resimg, resmask) 
+            # Image.fromarray(inpainted).save(paths[0])
+            # Image.fromarray(inpainted_edge).save(paths[1])
+            # Image.fromarray(edge).save(paths[2])
 
             self.debugger.img(inpainted, 'inpainted')
             self.debugger.img(inpainted_edge, 'inpainted_edge')
@@ -269,49 +149,84 @@ class MaskDivider:
             # don't apply to small object
             if obj['large']:
                 self.debugger.img(obj['mask'], 'check object')
-                x, y, _, _ = obj['box']
-                h, w = obj['height'], obj['width']
-                self.debugger.param(h, 'height')
-                self.debugger.param(w, 'width')
+                if self.config.pmd == 'all':
+                    objmask3c = np.stack([obj['mask'] for _ in range(3)],
+                                         axis=-1).astype(np.uint8)
+                    # insert inpainted image to lattice part in black image
+                    imglat = np.where(objmask3c == 1, obj['inpainted'], objmask3c)
+                    # insert this object mask image to not lattice part in black image
+                    masklat = np.zeros_like(obj['mask']).astype(np.uint8)
 
-                # create lattice mask image
-                lattice = np.zeros_like(obj['mask']).astype(np.uint8)
-                vline_w, hline_w = int(w / 16), int(h / 16)
-                self.debugger.param(vline_w, 'vline width')
-                self.debugger.param(hline_w, 'hline width')
-                # draw vertical line
-                lattice = cv2.line(lattice,
-                        (x + int(w * (5/16)), y + int(h * (1/8))),
-                        (x + int(w * (5/16)), y + int(h * (7/8))),
-                        1, vline_w)
-                lattice = cv2.line(lattice,
-                        (x + int(w * (11/16)), y + int(h * (1/8))),
-                        (x + int(w * (11/16)), y + int(h * (7/8))),
-                        1, vline_w)
-                # draw horizontal line
-                lattice = cv2.line(lattice,
-                        (x + int(w * (1/8)), y + int(h * (5/16))),
-                        (x + int(w * (7/8)), y + int(h * (5/16))),
-                        1, hline_w)
-                lattice = cv2.line(lattice,
-                        (x + int(w * (1/8)), y + int(h * (11/16))),
-                        (x + int(w * (7/8)), y + int(h * (11/16))),
-                        1, hline_w)
+                elif self.config.pmd == 'center':
+                    objmask = np.where(obj['mask'] > 0, 1, 0).astype(np.bool)
+                    distance = ndimage.distance_transform_edt(objmask)
+                    objmask = np.where(distance >= self.config.distance, 1, 0)
+                    objmask3c = np.stack([objmask for _ in range(3)],
+                                         axis=-1).astype(np.uint8)
+                    # insert inpainted image to lattice part in black image
+                    imglat = np.where(objmask3c == 1, obj['inpainted'], objmask3c)
+                    # insert this object mask image to not lattice part in black image
+                    masklat = np.where(objmask == 1, 0, obj['mask'])
 
-                lattice = np.where(obj['mask'] == 1, lattice, 0)
-                self.debugger.img(lattice, 'lattice image')
-                lattice3c = np.stack([lattice for _ in range(3)], axis=-1).astype(np.uint8)
-                # insert inpainted image to lattice part in black image
-                imglat = np.where(lattice3c == 1, obj['inpainted'], lattice3c)
-                # insert this object mask image to not lattice part in black image
-                masklat = np.where(lattice == 1, 0, obj['mask'])
+                elif self.config.pmd == 'dprob':
+                    objmask = np.where(obj['mask'] > 0, 1, 0).astype(np.bool)
+                    distance = ndimage.distance_transform_edt(objmask)
+                    maxd = np.max(distance)
+                    probmask = distance / maxd
+                    randmask = np.random.rand(objmask.shape[0], objmask.shape[1]).astype(np.float64)
+                    activemask = np.where(probmask + randmask >= 1, 1, 0).astype(np.uint8)
+                    activemask3c = np.stack([activemask for _ in range(3)],
+                                         axis=-1).astype(np.uint8)
+                    # insert inpainted image to lattice part in black image
+                    imglat = np.where(activemask3c == 1, obj['inpainted'], activemask3c)
+                    # insert this object mask image to not lattice part in black image
+                    masklat = np.where(activemask == 1, 0, obj['mask'])
+
+                elif self.config.pmd == 'lattice':
+                    x, y, _, _ = obj['box']
+                    h, w = obj['height'], obj['width']
+                    self.debugger.param(h, 'height')
+                    self.debugger.param(w, 'width')
+
+                    # create lattice mask image
+                    lattice = np.zeros_like(obj['mask']).astype(np.uint8)
+                    vline_w = int(w / self.config.line_width_div)
+                    hline_w = int(h / self.config.line_width_div)
+                    self.debugger.param(vline_w, 'vline width')
+                    self.debugger.param(hline_w, 'hline width')
+                    # draw vertical line
+                    lattice = cv2.line(lattice,
+                            (x + int(w * (5/16)), y + int(h * (1/8))),
+                            (x + int(w * (5/16)), y + int(h * (7/8))),
+                            1, vline_w)
+                    lattice = cv2.line(lattice,
+                            (x + int(w * (11/16)), y + int(h * (1/8))),
+                            (x + int(w * (11/16)), y + int(h * (7/8))),
+                            1, vline_w)
+                    # draw horizontal line
+                    lattice = cv2.line(lattice,
+                            (x + int(w * (1/8)), y + int(h * (5/16))),
+                            (x + int(w * (7/8)), y + int(h * (5/16))),
+                            1, hline_w)
+                    lattice = cv2.line(lattice,
+                            (x + int(w * (1/8)), y + int(h * (11/16))),
+                            (x + int(w * (7/8)), y + int(h * (11/16))),
+                            1, hline_w)
+
+                    lattice = np.where(obj['mask'] == 1, lattice, 0)
+                    self.debugger.img(lattice, 'lattice image')
+                    lattice3c = np.stack([lattice for _ in range(3)], axis=-1).astype(np.uint8)
+                    # insert inpainted image to lattice part in black image
+                    imglat = np.where(lattice3c == 1, obj['inpainted'], lattice3c)
+                    # insert this object mask image to not lattice part in black image
+                    masklat = np.where(lattice == 1, 0, obj['mask'])
 
             else:
                 imglat = np.zeros_like(img)
                 masklat = obj['mask']
 
-            self.debugger.img(imglat, 'lattice image')
-            self.debugger.img(masklat, 'lattice mask')
+            self.debugger.img(imglat, '{} image'.format(self.config.pmd))
+            self.debugger.img(masklat, '{} mask'.format(self.config.pmd))
 
             # unite all object lattice part image
             if idx == 0:
