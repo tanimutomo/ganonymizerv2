@@ -3,13 +3,13 @@ import cv2
 import torch
 
 from modules.ganonymizer import GANonymizer
-from modules.utils import Config, Debugger, create_dir, pmd_mode_change
+from modules.utils import Config, Debugger, create_dir, pmd_mode_change, load_img
 from config import get_config
 
 
 def main():
-    path = os.path.join(os.getcwd(), 'data/cityscapes/frankfurt')
-    impath = os.path.join(path, 'input', 'frankfurt_000001_041664_leftImg8bit.png')
+    path = os.path.join(os.getcwd(), 'data/exp/cityscapes_testset_1')
+    impath = os.path.join(path, 'input', 'ex_01.png')
 
     # set configs
     config = Config(get_config(path))
@@ -29,8 +29,11 @@ def main():
 
     if config.mode == 'img':
         print('Loading "{}"'.format(path)) 
+        img, fname, fext = load_img(path)
+        config.fname = fname
+        config.fext = fext
         # model prediction
-        model.predict(path)
+        model.predict(img)
 
     elif config.mode == 'dir':
         inpath = os.path.join(path, 'input')
@@ -39,7 +42,11 @@ def main():
                 if os.path.isfile(os.path.join(inpath, f)) and f[0] != '.']
         for f in files:
             print('Loading "{}"'.format(f)) 
-            model.predict(f)
+            img, fname, fext = load_img(f)
+            config.fname = fname
+            config.fext = fext
+            # model prediction
+            model.predict(img)
 
     elif config.mode == 'pmd':
         inpath = os.path.join(path, 'input')
@@ -52,14 +59,20 @@ def main():
             # with pmd
             config = pmd_mode_change(config, 'on')
             model.reload_config(config)
-            out_on = model.predict(f)
+            img, fname, fext = load_img(f)
+            config.fname = fname
+            config.fext = fext
+            # model prediction
+            out_on = model.predict(img)
             
             # without pmd
             config = pmd_mode_change(config, 'off')
             model.reload_config(config)
-            out_off = model.predict(f)
-
-            # calcurate psnr and ssim
+            img, fname, fext = load_img(f)
+            config.fname = fname
+            config.fext = fext
+            # model prediction
+            out_on = model.predict(img)
 
 
 
