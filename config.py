@@ -9,14 +9,15 @@ def get_config(path):
             'cuda': 0,
 
             # *_mode (choose in ['pass', 'save', 'exec', 'debug', 'none'])
-            'main_mode': 'save',
+            'main_mode': 'exec',
             'semseg_mode': 'pass',
             'mask_mode': 'pass',
-            'split_mode': 'debug',
-            'shadow_mode': 'save',
-            'random_mode': 'save', # evaluate pmd
-            'divide_mode': 'save',
-            'inpaint_mode': 'save',
+            'split_mode': 'pass',
+            'shadow_mode': 'pass',
+            'divide_mode': 'pass',
+            'inpaint_mode': 'pass',
+            # evaluate pmd
+            'random_mode': 'none', 
 
             # evaluate pmd
             'eval_pmd_path': os.path.join(path, 'pmd'),

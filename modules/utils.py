@@ -9,6 +9,16 @@ from collections import namedtuple
 from skimage.segmentation import mark_boundaries
 
 
+def load_img(img_path):
+    # Loading input image
+    print('===== Loading Image =====')
+    fname, fext = img_path.split('/')[-1].split('.')
+    img = Image.open(img_path)
+    img = np.array(img)
+    # visualization
+    return img, fname, fext
+
+
 def tensor_img_to_numpy(tensor):
     array = tensor.numpy()
     array = np.transpose(array, (1, 2, 0))

@@ -30,10 +30,17 @@ class GANonymizer:
 
     def reload_config(self, config):
         self.config = config
+        self.debugger = Debugger(config.main_mode, save_dir=config.checkpoint)
+        self.ss = SemanticSegmenter(config, device)
+        self.mc = MaskCreater(config)
+        self.op = ObjectSpliter(config)
+        self.sd = ShadowDetecter(config)
+        self.ii = ImageInpainter(config, device)
+        self.md = MaskDivider(config, self.ii)
+        self.rm = RandMaskCreater(config)
     
-    def predict(self, img_path):
-        # loading input image
-        img = self._load_img(img_path)
+    def predict(self, img):
+        self.debugger.img(img, 'Input Image')
 
         # semantic segmentation for detecting dynamic objects and creating mask
         segmap = self._semseg(img)
@@ -68,18 +75,6 @@ class GANonymizer:
         return out
 
 
-    def _load_img(self, img_path):
-        # Loading input image
-        print('===== Loading Image =====')
-        self.fname, self.fext = img_path.split('/')[-1].split('.')
-        img = Image.open(img_path)
-        img = np.array(img)
-
-        # visualization
-        self.debugger.img(img, 'Input Image')
-
-        return img
-
     def _resize(self, img):
         # resize inputs
         new_h = int(img.shape[0] / self.config.resize_factor)
@@ -95,7 +90,7 @@ class GANonymizer:
         mask = np.where(omask + smask > 0, 255, 0).astype(np.uint8)
         mask = expand_mask(mask, self.config.expand_width)
         self.debugger.img(mask, 'Mask (Object Mask + Shadow Mask)')
-        self.debugger.imsave(mask, self.fname + '_mask.' + self.fext)
+        self.debugger.imsave(mask, self.config.fname + '_mask.' + self.config.fext)
 
         # expand labelmap
         for label in range(1, np.max(labelmap)+1):
@@ -109,13 +104,13 @@ class GANonymizer:
         mask3c = np.stack([mask, np.zeros_like(mask), np.zeros_like(mask)], axis=-1)
         overlay = (img * 0.7 + mask3c * 0.3).astype(np.uint8)
         self.debugger.img(overlay, 'Mask Overlayed Image')
-        self.debugger.imsave(overlay, self.fname + '_mask_overlayed.' + self.fext)
+        self.debugger.imsave(overlay, self.config.fname + '_mask_overlayed.' + self.config.fext)
 
         # image with mask
         mask3c = np.stack([mask for _ in range(3)], axis=-1)
         img_with_mask = np.where(mask3c==255, mask3c, img).astype(np.uint8)
         self.debugger.img(img_with_mask, 'Image with Mask')
-        self.debugger.imsave(img_with_mask, self.fname + '_img_with_mask.' + self.fext)
+        self.debugger.imsave(img_with_mask, self.config.fname + '_img_with_mask.' + self.config.fext)
 
         return mask, labelmap
 
@@ -149,7 +144,7 @@ class GANonymizer:
         omask3c = np.stack([omask, np.zeros_like(omask), np.zeros_like(omask)], axis=-1)
         overlay = (img * 0.7 + omask3c * 0.3).astype(np.uint8)
         self.debugger.img(overlay, 'Object Mask Overlayed Image')
-        self.debugger.imsave(overlay, self.fname + '_omask_overlayed.' + self.fext)
+        self.debugger.imsave(overlay, self.config.fname + '_omask_overlayed.' + self.config.fext)
 
         return omask
 
@@ -179,7 +174,7 @@ class GANonymizer:
         smask3c = np.stack([smask, np.zeros_like(smask), np.zeros_like(smask)], axis=-1)
         overlay = (img * 0.7 + smask3c * 0.3).astype(np.uint8)
         self.debugger.img(overlay, 'Shadow Mask Overlayed Image')
-        self.debugger.imsave(overlay, self.fname + '_smask_overlayed.' + self.fext)
+        self.debugger.imsave(overlay, self.config.fname + '_smask_overlayed.' + self.config.fext)
 
         return smask, labelmap
 
@@ -193,7 +188,7 @@ class GANonymizer:
             divimg, divmask = self._exec_module(self.config.divide_mode,
                                                 ['divimg', 'divmask'],
                                                 self.md.divide,
-                                                img, mask, labelmap, self.fname, self.fext)
+                                                img, mask, labelmap, self.config.fname, self.config.fext)
         return divimg, divmask
 
     def _inpaint(self, img, mask):
@@ -223,12 +218,12 @@ class GANonymizer:
 
     def _exec_module(self, mode, names, func, *args):
         if isinstance(names, str):
-            path = os.path.join(self.config.checkpoint, self.fname + '_{}.'.format(names) + 'pkl')
+            path = os.path.join(self.config.checkpoint, self.config.fname + '_{}.'.format(names) + 'pkl')
         else:
             paths = []
             for name in names:
                 paths.append(os.path.join(self.config.checkpoint,
-                    self.fname + '_{}.'.format(name) + 'pkl'))
+                    self.config.fname + '_{}.'.format(name) + 'pkl'))
 
         if mode in ['exec', 'debug']:
             if isinstance(names, str):
@@ -258,12 +253,12 @@ class GANonymizer:
         # visualization
         if isinstance(names, str):
             self.debugger.img(result, names)
-            self.debugger.imsave(result, self.fname + '_{}.'.format(names) + self.fext)
+            self.debugger.imsave(result, self.config.fname + '_{}.'.format(names) + self.config.fext)
             return result
         else:
             for res, name in zip(results, names):
                 self.debugger.img(res, name)
-                self.debugger.imsave(res, self.fname + '_{}.'.format(name) + self.fext)
+                self.debugger.imsave(res, self.config.fname + '_{}.'.format(name) + self.config.fext)
             return results
 
     def _save_output(self, out):
@@ -274,12 +269,11 @@ class GANonymizer:
         
         if self.config.mode == 'pmd':
             savepath = os.path.join(self.config.eval_pmd_path,
-                                    '{}_out_{}.{}'.format(self.fname, pmd, self.fext))
+                                    '{}_out_{}.{}'.format(self.config.fname, pmd, self.config.fext))
         else:
             savepath = os.path.join(self.config.output,
                                     '{}_out_expanded_{}_shadow_{}_pmd_{}.{}'.format(
-                                        self.fname, self.config.expand_width,
-                                        shadow, pmd, self.fext))
+                                        self.config.fname, self.config.expand_width,
+                                        shadow, pmd, self.config.fext))
         outimg.save(savepath)
-
 
