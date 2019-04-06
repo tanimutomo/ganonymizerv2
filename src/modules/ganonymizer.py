@@ -270,6 +270,9 @@ class GANonymizer:
         if self.config.mode == 'pmd':
             savepath = os.path.join(self.config.eval_pmd_path,
                                     '{}_out_{}.{}'.format(self.config.fname, pmd, self.config.fext))
+        elif self.config.mode == 'demo':
+            savepath = os.path.join(self.config.output,
+                                    '{}_out.{}'.format(self.config.fname, self.config.fext))
         else:
             savepath = os.path.join(self.config.output,
                                     '{}_out_expanded_{}_shadow_{}_pmd_{}.{}'.format(
