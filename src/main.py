@@ -26,6 +26,12 @@ def main(mode, data_root, filename=None):
     config = Config(get_config(data_root))
     config.mode = mode
 
+    # set moduels root path
+    if os.path.basename(os.getcwd()) == 'src':
+        config.mod_root = os.path.join(os.getcwd(), 'modules')
+    elif os.path.basename(os.getcwd()) == 'ganonymizerv2':
+        config.mod_root = os.path.join(os.getcwd(), 'src', 'modules')
+
     # create directories
     if config.mode == 'img' or config.mode == 'demo':
         filepath = create_dir(filepath)
