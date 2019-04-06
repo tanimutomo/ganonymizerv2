@@ -139,9 +139,7 @@ def create_dir(path):
         if os.path.isfile(path):
             dirpath = os.path.dirname(path)
             rootpath = os.path.dirname(dirpath)
-            print(dirpath, rootpath)
             if os.path.basename(dirpath) == 'input':
-                print(os.path.basename(dirpath))
                 _create_det_dir(rootpath)
                 return path
             else:
@@ -168,6 +166,8 @@ def create_dir(path):
                     shutil.move(f, os.path.join(path, 'input'))
                 _create_det_dir(path)
                 return path
+    else:
+        raise RuntimeError('input argument path is not existed')
 
 
 def _create_det_dir(rootpath):
