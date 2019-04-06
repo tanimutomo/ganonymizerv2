@@ -60,7 +60,6 @@ def get_config(path):
 
             # inpaint
             'inpaint': 'EdgeConnect',
-            'inpaint_ckpt': 'modules/edge_connect/checkpoints',
             'sigma': 2 # for canny edge detection
             }
     return config
