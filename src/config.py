@@ -2,8 +2,6 @@ import os
 def get_config(path):
     config = {
             # execution setting
-            # mode should be choosen from ['img', 'dir', 'pmd']
-            'mode': 'img',
             'checkpoint': os.path.join(path, 'ckpt'),
             'output': os.path.join(path, 'output'),
             'cuda': 0,
