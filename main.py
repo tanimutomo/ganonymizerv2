@@ -102,7 +102,7 @@ def main(mode, data_root, filename=None):
 if __name__ == '__main__':
     # mode should be choosen from ['img', 'dir', 'pmd', 'demo']
     mode = 'img'
-    data_root = os.path.join(os.getcwd(), 'data/exp/cityscapes_testset_1')
-    filename = 'ex_01.png'
+    data_root = os.path.join(os.getcwd(), 'data/exp/for_demo')
+    filename = 'car_image.png'
     main(mode, data_root, filename)
 
