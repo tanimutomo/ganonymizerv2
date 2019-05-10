@@ -18,8 +18,10 @@ class ImageInpainter():
         return output, out_edge, edge
 
     def _set_edge_connect(self):
-        model = SimpleEdgeConnect(self.config.inpaint_ckpt, 
-                                  self.config.sigma, self.device,
+        inpaint_ckpt = os.path.join(self.config.mod_root, 'edge_connect/checkpoints')
+        model = SimpleEdgeConnect(inpaint_ckpt, 
+                                  self.config.sigma,
+                                  self.device,
                                   self.debugger)
         return model
 

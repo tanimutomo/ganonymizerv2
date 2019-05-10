@@ -19,6 +19,32 @@ def load_img(img_path):
     return img, fname, fext
 
 
+def demo_resize(img):
+    # Resize Input image for demonstration
+    h, w = img.shape[0], img.shape[1]
+    if h <= 1024 and w <= 1024:
+        return img
+
+    side, new_side = np.array([w, h]), np.array([0, 0])
+    if side[0] >= side[1]:
+        is_side_exchanged = False
+    else:
+        side = side[::-1]
+        is_side_exchanged = True
+
+    new_side[0] = 1024
+    new_side[1] = side[1] * (1024 / side[0])
+    new_side = new_side.astype(np.int32)
+    new_side[1] -= (new_side[1] % 4)
+
+    if is_side_exchanged:
+        new_side = new_side[::-1]
+    out = Image.fromarray(img)
+    out = out.resize((new_side[0], new_side[1]))
+
+    return np.array(out).astype(np.uint8)
+
+
 def tensor_img_to_numpy(tensor):
     array = tensor.numpy()
     array = np.transpose(array, (1, 2, 0))
@@ -94,14 +120,26 @@ def pmd_mode_change(config, pmd):
     return config
 
 
+def demo_config(config):
+    config.main_mode = 'exec'
+    config.semseg_mode = 'exec'
+    config.mask_mode = 'exec'
+    config.split_mode = 'exec'
+    config.shadow_mode = 'exec'
+    config.divide_mode = 'exec'
+    config.inpaint_mode = 'exec'
+
+    config.random_mode = 'none'
+
+    return config
+
+
 def create_dir(path):
     if os.path.exists(path):
         if os.path.isfile(path):
             dirpath = os.path.dirname(path)
             rootpath = os.path.dirname(dirpath)
-            print(dirpath, rootpath)
             if os.path.basename(dirpath) == 'input':
-                print(os.path.basename(dirpath))
                 _create_det_dir(rootpath)
                 return path
             else:
@@ -128,6 +166,8 @@ def create_dir(path):
                     shutil.move(f, os.path.join(path, 'input'))
                 _create_det_dir(path)
                 return path
+    else:
+        raise RuntimeError('input argument path is not existed')
 
 
 def _create_det_dir(rootpath):
