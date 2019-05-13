@@ -39,25 +39,15 @@ class SimpleEdgeConnect():
         np.random.seed(config.SEED)
         random.seed(config.SEED)
 
+    def edge_inpaint(self, gray, edge, mask):
+        return self.edge_model(gray, edge, mask).detach()
 
-    def inpaint(self, img, mask):
-        # preprocess
-        img, gray, mask, edge = self._preprocess(img, mask)
-
-        # inpaint with edge model / joint model
-        out_edge = self.edge_model(gray, edge, mask).detach()
+    def image_inpaint(self, img, edge, mask):
         output = self.inpaint_model(img, edge, mask)
-        output_merged = (output * mask) + (img * (1 - mask))
+        output = (output * mask) + (img * (1 - mask))
+        return output
 
-        # postprocess
-        edge = self._postprocess(edge)
-        out_edge = self._postprocess(out_edge)
-        output = self._postprocess(output_merged)
-
-        return output, out_edge, edge
-
-
-    def _preprocess(self, img, mask):
+    def preprocess(self, img, mask):
         # img and mask is np.ndarray
         gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
         edge = self._get_edge(gray, mask)
@@ -95,7 +85,7 @@ class SimpleEdgeConnect():
         return items
 
 
-    def _postprocess(self, img):
+    def postprocess(self, img):
         # [0, 1] => [0, 255]
         img = img * 255.0
         img = img.permute(0, 2, 3, 1).squeeze()
