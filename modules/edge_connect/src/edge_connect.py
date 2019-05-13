@@ -41,6 +41,23 @@ class SimpleEdgeConnect():
 
 
     def inpaint(self, img, mask):
+        # preprocess
+        img, gray, mask, edge = self._preprocess(img, mask)
+
+        # inpaint with edge model / joint model
+        out_edge = self.edge_model(gray, edge, mask).detach()
+        output = self.inpaint_model(img, edge, mask)
+        output_merged = (output * mask) + (img * (1 - mask))
+
+        # postprocess
+        edge = self._postprocess(edge)
+        out_edge = self._postprocess(out_edge)
+        output = self._postprocess(output_merged)
+
+        return output, out_edge, edge
+
+
+    def _preprocess(self, img, mask):
         # img and mask is np.ndarray
         gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
         edge = self._get_edge(gray, mask)
@@ -49,20 +66,12 @@ class SimpleEdgeConnect():
                 self.debugger.img(item, name)
             else:
                 self.debugger.img(item, name)
+
         img, gray, mask, edge = self._cuda_tensor(img, gray, mask, edge)
         for item, name in [(img, 'img'), (mask, 'mask'), (gray, 'gray'), (edge, 'edge')]:
             self.debugger.matrix(item, name)
 
-        # inpaint with edge model / joint model
-        out_edge = self.edge_model(gray, edge, mask).detach()
-        output = self.inpaint_model(img, edge, mask)
-        output_merged = (output * mask) + (img * (1 - mask))
-
-        edge = self._postprocess(edge)
-        out_edge = self._postprocess(out_edge)
-        output = self._postprocess(output_merged)
-
-        return output, out_edge, edge
+        return img, gray, mask, edge
 
 
     def _get_edge(self, gray, mask):
