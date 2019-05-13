@@ -121,4 +121,4 @@ data/exp/
 *.pth
 *.pkl
 exp/
-visualization.ipynb
+*.ipynb
