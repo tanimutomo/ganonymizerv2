@@ -6,6 +6,9 @@ def get_config(path):
             'output': os.path.join(path, 'output'),
             'cuda': 0,
 
+            # Interactive Edge Writing (choose in ['write', 'inpaint'])
+            'edge': 'write',
+
             # *_mode (choose in ['pass', 'save', 'exec', 'debug', 'none'])
             'main_mode': 'save',
             'semseg_mode': 'save',
