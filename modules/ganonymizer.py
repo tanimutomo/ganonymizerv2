@@ -8,6 +8,7 @@ from .semantic_segmenter import SemanticSegmenter
 from .mask_creater import MaskCreater
 from .object_spliter import ObjectSpliter
 from .shadow_detecter import ShadowDetecter
+from .edge_writer import EdgeWriter
 from .mask_divider import MaskDivider
 from .inpainter import ImageInpainter
 from .randmask_creater import RandMaskCreater
@@ -24,6 +25,7 @@ class GANonymizer:
         self.mc = MaskCreater(config)
         self.op = ObjectSpliter(config)
         self.sd = ShadowDetecter(config)
+        self.ew = EdgeWriter(config)
         self.ii = ImageInpainter(config, device)
         self.md = MaskDivider(config, self.ii)
         self.rm = RandMaskCreater(config)
