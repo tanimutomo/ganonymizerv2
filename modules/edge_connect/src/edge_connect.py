@@ -51,13 +51,11 @@ class SimpleEdgeConnect():
         # img and mask is np.ndarray
         gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
         edge = self._get_edge(gray, mask)
+        # debug
         for item, name in [(img, 'img'), (mask, 'mask'), (gray, 'gray'), (edge, 'edge')]:
-            if len(item.shape) == 3:
                 self.debugger.img(item, name)
-            else:
-                self.debugger.img(item, name)
-
-        img, gray, mask, edge = self._cuda_tensor(img, gray, mask, edge)
+        img, gray, mask, edge = self.cuda_tensor(img, gray, mask, edge)
+        # debug
         for item, name in [(img, 'img'), (mask, 'mask'), (gray, 'gray'), (edge, 'edge')]:
             self.debugger.matrix(item, name)
 
@@ -72,7 +70,7 @@ class SimpleEdgeConnect():
         return edge * 255
 
 
-    def _cuda_tensor(self, *args):
+    def cuda_tensor(self, *args):
         items = []
         for item in args:
             item = torch.from_numpy(item / 255.0)
