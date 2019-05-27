@@ -111,7 +111,7 @@ venv.bak/
 dmypy.json
 
 .DS_Store
-kronos-config.yml
+# kronos-config.yml
 modules/deeplabv3/pretrained/
 modules/edge_connect/docker/
 modules/edge_connect/kronos-config.yml
