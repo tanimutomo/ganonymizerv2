@@ -7,5 +7,5 @@ opencv-contrib-python ~= 4.0.0
 scikit-image ~= 0.14.0
 scikit-learn
 pyyaml
-torch==1.0.0
+torch
 torchvision
