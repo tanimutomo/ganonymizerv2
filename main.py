@@ -2,7 +2,8 @@ import os
 import cv2
 import torch
 
-if os.path.basename(os.getcwd()) == 'src':
+
+if os.path.basename(os.getcwd()) in ['src', 'app']:
     from modules.ganonymizer import GANonymizer
     from modules.utils import Config, Debugger, create_dir, \
             pmd_mode_change, load_img, demo_config, demo_resize
@@ -27,7 +28,7 @@ def main(mode, data_root, filename=None):
     config.mode = mode
 
     # set moduels root path
-    if os.path.basename(os.getcwd()) == 'src':
+    if os.path.basename(os.getcwd()) in ['src', 'app']:
         config.mod_root = os.path.join(os.getcwd(), 'modules')
     elif os.path.basename(os.getcwd()) == 'ganonymizerv2':
         config.mod_root = os.path.join(os.getcwd(), 'src', 'modules')
@@ -102,7 +103,7 @@ def main(mode, data_root, filename=None):
 if __name__ == '__main__':
     # mode should be choosen from ['img', 'dir', 'pmd', 'demo']
     mode = 'img'
-    data_root = os.path.join(os.getcwd(), 'data/exp/for_demo')
-    filename = 'car_image.png'
+    data_root = os.path.join(os.getcwd(), 'data/exp/cityscapes_testset')
+    filename = 'ex_01.png'
     main(mode, data_root, filename)
 
