@@ -14,7 +14,7 @@ else:
     from .config import get_config
 
 
-def main(mode, data_root, filename=None):
+def main(mode, data_root, filename=None, config=None):
     # raise argument error
     if filename:
         assert mode == 'img' or mode == 'demo'
@@ -23,7 +23,9 @@ def main(mode, data_root, filename=None):
         assert mode == 'pmd' or mode == 'dir'
 
     # set configs
-    config = Config(get_config(data_root))
+    if not config:
+        config = get_config(data_root)
+    config = Config(config)
     config.mode = mode
 
     # set moduels root path

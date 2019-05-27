@@ -8,6 +8,7 @@ from .semantic_segmenter import SemanticSegmenter
 from .mask_creater import MaskCreater
 from .object_spliter import ObjectSpliter
 from .shadow_detecter import ShadowDetecter
+from .edge_drawer import EdgeDrawer
 from .mask_divider import MaskDivider
 from .inpainter import ImageInpainter
 from .randmask_creater import RandMaskCreater
@@ -24,6 +25,7 @@ class GANonymizer:
         self.mc = MaskCreater(config)
         self.op = ObjectSpliter(config)
         self.sd = ShadowDetecter(config)
+        self.ew = EdgeDrawer(config)
         self.ii = ImageInpainter(config, device)
         self.md = MaskDivider(config, self.ii)
         self.rm = RandMaskCreater(config)
@@ -54,6 +56,9 @@ class GANonymizer:
         # detect shadow area and add shadow area to object mask
         smask, labelmap = self._detect_shadow(img, labelmap)
         mask, labelmap = self._combine_masks(img, omask, smask, labelmap)
+
+        # draw the missed parts of edge map
+        edge = self._draw_edge(img, mask)
 
         # create random mask for evaluate the effect of PMD
         mask, labelmap = self._random_mask(mask, labelmap)

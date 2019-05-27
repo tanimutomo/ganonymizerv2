@@ -14,8 +14,26 @@ class ImageInpainter():
             self.model = self._set_edge_connect()
 
     def inpaint(self, img, mask):
-        output, out_edge, edge = self.model.inpaint(img, mask)
+        # preprocess
+        img, gray, mask, edge = self.model.preprocess(img, mask)
+        # edge inpainting
+        out_edge = self.model.edge_inpaint(gray, edge, mask)
+        # color image inpainting
+        output = self.model.image_inpaint(img, out_edge, mask)
+        # postprocess
+        edge = self.model.postprocess(edge)
+        out_edge = self.model.postprocess(out_edge)
+        output = self.model.postprocess(output)
         return output, out_edge, edge
+
+    def color_inpaint(self, img, edge, mask):
+        # preprocess
+        img, edge, mask = self.model.cuda_tensor(img, edge, mask)
+        # color image inpainting
+        output = self.model.image_inpaint(img, edge, mask)
+        # postprocess
+        output = self.model.postprocess(output)
+        return output
 
     def _set_edge_connect(self):
         inpaint_ckpt = os.path.join(self.config.mod_root, 'edge_connect/checkpoints')

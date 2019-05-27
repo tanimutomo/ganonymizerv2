@@ -39,30 +39,27 @@ class SimpleEdgeConnect():
         np.random.seed(config.SEED)
         random.seed(config.SEED)
 
+    def edge_inpaint(self, gray, edge, mask):
+        return self.edge_model(gray, edge, mask).detach()
 
-    def inpaint(self, img, mask):
+    def image_inpaint(self, img, edge, mask):
+        output = self.inpaint_model(img, edge, mask)
+        output = (output * mask) + (img * (1 - mask))
+        return output
+
+    def preprocess(self, img, mask):
         # img and mask is np.ndarray
         gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
         edge = self._get_edge(gray, mask)
+        # debug
         for item, name in [(img, 'img'), (mask, 'mask'), (gray, 'gray'), (edge, 'edge')]:
-            if len(item.shape) == 3:
                 self.debugger.img(item, name)
-            else:
-                self.debugger.img(item, name)
-        img, gray, mask, edge = self._cuda_tensor(img, gray, mask, edge)
+        img, gray, mask, edge = self.cuda_tensor(img, gray, mask, edge)
+        # debug
         for item, name in [(img, 'img'), (mask, 'mask'), (gray, 'gray'), (edge, 'edge')]:
             self.debugger.matrix(item, name)
 
-        # inpaint with edge model / joint model
-        out_edge = self.edge_model(gray, edge, mask).detach()
-        output = self.inpaint_model(img, edge, mask)
-        output_merged = (output * mask) + (img * (1 - mask))
-
-        edge = self._postprocess(edge)
-        out_edge = self._postprocess(out_edge)
-        output = self._postprocess(output_merged)
-
-        return output, out_edge, edge
+        return img, gray, mask, edge
 
 
     def _get_edge(self, gray, mask):
@@ -73,7 +70,7 @@ class SimpleEdgeConnect():
         return edge * 255
 
 
-    def _cuda_tensor(self, *args):
+    def cuda_tensor(self, *args):
         items = []
         for item in args:
             item = torch.from_numpy(item / 255.0)
@@ -86,7 +83,7 @@ class SimpleEdgeConnect():
         return items
 
 
-    def _postprocess(self, img):
+    def postprocess(self, img):
         # [0, 1] => [0, 255]
         img = img * 255.0
         img = img.permute(0, 2, 3, 1).squeeze()
