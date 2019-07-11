@@ -278,5 +278,6 @@ class GANonymizer:
                                     '{}_out_expanded_{}_shadow_{}_pmd_{}.{}'.format(
                                         self.config.fname, self.config.expand_width,
                                         shadow, pmd, self.config.fext))
-        outimg.save(savepath)
+        if self.config.mode != "video":
+            outimg.save(savepath)
 

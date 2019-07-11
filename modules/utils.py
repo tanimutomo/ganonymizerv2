@@ -35,12 +35,14 @@ def load_video(path):
     return fname, cap, fps, frames, W, H
     
 
-def video_writer(video, fname, fps, width, height):
-    outfile = os.path.join(os.getcwd(), 'data/fujisawa/videos/out_{}'.format(fname))
+def video_writer(in_path, fps, width, height):
+    fname, fext = in_path.split('/')[-1].split('.')
+    out_path = os.path.join('/'.join(in_path.split('/')[:-2]),
+                            "output", "out_" + fname + '.' + fext)
+    print("Saved Video Path:", out_path)
     # video writer
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    writer = cv2.VideoWriter(outfile, fourcc, fps, (width, height))
-
+    writer = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
     return writer
 
 

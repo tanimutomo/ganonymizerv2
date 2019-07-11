@@ -20,7 +20,7 @@ else:
 def main(mode, data_root, filename=None):
     # raise argument error
     if filename:
-        assert mode == 'img' or mode == 'demo'
+        assert mode == 'img' or mode == 'demo' or mode == "video"
         filepath = os.path.join(data_root, 'input', filename)
     else:
         assert mode == 'pmd' or mode == 'dir'
@@ -106,8 +106,7 @@ def main(mode, data_root, filename=None):
         count = 1
         # Load the video
         fname, cap, origin_fps, frames, width, height = load_video(filepath)
-        writer = video_writer(filepath, 0, 
-                              origin_fps, width, height*2)
+        writer = video_writer(filepath, origin_fps, width, height*2)
         config.fname, config.fext = "0", "0"
 
         while(cap.isOpened()):
@@ -135,8 +134,8 @@ def main(mode, data_root, filename=None):
 
 if __name__ == '__main__':
     # mode should be choosen from ['img', 'dir', 'pmd', 'demo']
-    mode = 'img'
-    data_root = os.path.join(os.getcwd(), 'data/exp/cityscapes_testset')
-    filename = 'ex_01.png'
+    mode = "video"
+    data_root = os.path.join(os.getcwd(), "data/video")
+    filename = "noon_half_short.avi"
     main(mode, data_root, filename)
 
