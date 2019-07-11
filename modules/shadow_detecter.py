@@ -493,11 +493,28 @@ class ShadowDetecter:
         return filtered_contours
             
     def _draw_contours_as_point(self, img, contours, area):
+        """
+        Get the contours' pixels of the bottom area of the objects.
+        """
         # radius = int(np.sqrt(area) / 2)
+        # radius = 1
         out = img.copy()
-        radius = 1
-        for cnt in contours:
-            cnt = np.squeeze(cnt)
+
+        # Connect the all separated contours into a array.
+        if len(contours) == 1:
+            contour = contours[0]
+        else:
+            for i, cnt in enumerate(contours):
+                if i == 0:
+                    contour = cnt
+                else:
+                    contour = np.concatenate([contour, cnt], axis=0)
+        self.debugger.matrix(contour, "contour")
+
+
+        # Draw the point to the image
+        for cnt in contour:
+            # cnt = np.squeeze(cnt)
             for point in cnt:
                 point = (point[0], point[1])
                 out[point[1], point[0]] = 255

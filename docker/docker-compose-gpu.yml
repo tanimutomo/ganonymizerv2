@@ -1,10 +1,12 @@
 version: '2.3'
 services:
   experiment:
+    ports:
+    - 8888:8888
     runtime: nvidia
     volumes:
-      - ..:/app
+    - ..:/app
     build:
       context: .
       dockerfile: gpu.Dockerfile
-    image: tf_gpu_sample
+    image: tanimu/ganonymizerv2

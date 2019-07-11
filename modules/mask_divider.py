@@ -34,7 +34,7 @@ class MaskDivider:
         for label in range(1, np.max(labelmap) + 1):
             self.debugger.param(label, 'label number')
             # get object mask
-            objmask = np.where(labelmap == label, 1, 0)
+            objmask = np.where(labelmap == label, 1, 0).astype(np.uint8)
             self.debugger.img(objmask, 'objmask')
 
             # calcurate object area
@@ -155,7 +155,7 @@ class MaskDivider:
                     # insert inpainted image to lattice part in black image
                     imglat = np.where(objmask3c == 1, obj['inpainted'], objmask3c)
                     # insert this object mask image to not lattice part in black image
-                    masklat = np.zeros_like(obj['mask']).astype(np.uint8)
+                    masklat = np.zeros_like(obj['mask'])
 
                 elif self.config.pmd == 'center':
                     objmask = np.where(obj['mask'] > 0, 1, 0).astype(np.bool)
@@ -233,6 +233,8 @@ class MaskDivider:
                 new_img = imglat
                 new_mask = masklat
             else:
+                self.debugger.matrix(new_mask, 'new_mask')
+                self.debugger.matrix(masklat, 'masklat')
                 new_img += imglat
                 new_mask += masklat
 
@@ -241,11 +243,9 @@ class MaskDivider:
 
         # substitute original image for not lattice part
         new_img = np.where(new_img == 0, img, new_img)
-        new_mask = np.where(new_mask > 0, 255, 0)
+        new_mask = np.where(new_mask > 0, 255, 0).astype(np.uint8)
 
         self.debugger.img(new_img, 'new_img')
         self.debugger.img(new_mask, 'new_mask')
 
         return new_img.astype(np.uint8), new_mask.astype(np.uint8)
-
-

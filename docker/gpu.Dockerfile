@@ -61,6 +61,7 @@ RUN apt-get update && apt-get install -y \
 RUN ${PIP} install --upgrade \
     pip \
     setuptools
+RUN pip install jupyter
 
 # begin install for opencv
 RUN OPENCV_VERSION="4.0.0" && \
