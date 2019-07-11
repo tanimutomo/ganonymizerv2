@@ -19,6 +19,31 @@ def load_img(img_path):
     return img, fname, fext
 
 
+def load_video(path):
+    """
+    Load the input video data
+    """
+    print('===== Loading Image =====')
+    fname, fext = path.split('/')[-1].split('.')
+    cap = cv2.VideoCapture(path)
+    W = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    H = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    print('[INFO] total frame: {}, fps: {}, width: {}, height: {}'.format(frames, fps, W, H))
+
+    return fname, cap, fps, frames, W, H
+    
+
+def video_writer(video, fname, fps, width, height):
+    outfile = os.path.join(os.getcwd(), 'data/fujisawa/videos/out_{}'.format(fname))
+    # video writer
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    writer = cv2.VideoWriter(outfile, fourcc, fps, (width, height))
+
+    return writer
+
+
 def demo_resize(img):
     # Resize Input image for demonstration
     h, w = img.shape[0], img.shape[1]

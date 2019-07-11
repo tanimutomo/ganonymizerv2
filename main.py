@@ -1,17 +1,19 @@
-import os
+import copy
 import cv2
+import numpy as np
+import os
 import torch
 
 
 if os.path.basename(os.getcwd()) in ['src', 'app']:
     from modules.ganonymizer import GANonymizer
     from modules.utils import Config, Debugger, create_dir, \
-            pmd_mode_change, load_img, demo_config, demo_resize
+            pmd_mode_change, load_img, demo_config, demo_resize, load_video, video_writer
     from config import get_config
 else:
     from .modules.ganonymizer import GANonymizer
     from .modules.utils import Config, Debugger, create_dir, \
-            pmd_mode_change, load_img, demo_config, demo_resize
+            pmd_mode_change, load_img, demo_config, demo_resize, load_video
     from .config import get_config
 
 
@@ -44,7 +46,7 @@ def main(mode, data_root, filename=None):
             if torch.cuda.is_available() else 'cpu')
 
     # if the mode is 'demo', all modules mode is changed 'exec'.
-    if config.mode == 'demo':
+    if config.mode == 'demo' or config.mode == "video":
         config = demo_config(config)
 
     # define the model
@@ -98,6 +100,37 @@ def main(mode, data_root, filename=None):
             config.fext = fext
             # model prediction
             out_on = model.predict(img)
+
+    elif config.mode == "video":
+        print("Loading '{}'".format(filepath))
+        count = 1
+        # Load the video
+        fname, cap, origin_fps, frames, width, height = load_video(filepath)
+        writer = video_writer(filepath, 0, 
+                              origin_fps, width, height*2)
+        config.fname, config.fext = "0", "0"
+
+        while(cap.isOpened()):
+            print('')
+            ret, frame = cap.read()
+            if ret:
+                print('-----------------------------------------------------')
+                print('[INFO] Count: {}/{}'.format(count, frames))
+
+                # process
+                img = copy.deepcopy(frame)
+                output = model.predict(img)
+                concat = np.concatenate([frame, output], axis=0)
+                writer.write(concat)
+                count += 1
+
+            else:
+                break
+
+        # Stop video process
+        cap.release()
+        writer.release()
+        cv2.destroyAllWindows()
 
 
 if __name__ == '__main__':
