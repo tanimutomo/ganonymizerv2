@@ -7,13 +7,13 @@ def get_config(path):
             'cuda': 0,
 
             # *_mode (choose in ['pass', 'save', 'exec', 'debug', 'none'])
-            'main_mode': 'save',
-            'semseg_mode': 'save',
-            'mask_mode': 'save',
-            'split_mode': 'save',
-            'shadow_mode': 'save',
-            'divide_mode': 'save',
-            'inpaint_mode': 'save',
+            'main_mode': 'exec',
+            'semseg_mode': 'exec',
+            'mask_mode': 'exec',
+            'split_mode': 'exec',
+            'shadow_mode': 'exec',
+            'divide_mode': 'exec',
+            'inpaint_mode': 'exec',
             # evaluate pmd
             'random_mode': 'none', 
 

@@ -120,5 +120,7 @@ data/exp/
 *.png
 *.pth
 *.pkl
+*.avi
 exp/
 visualization.ipynb
+

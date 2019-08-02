@@ -186,7 +186,7 @@ class ResNet_BasicBlock_OS8(nn.Module):
         elif num_layers == 34:
             resnet = models.resnet34()
             # load pretrained model:
-            resnet.load_state_dict(torch.load(res_paht, map_location=device))
+            resnet.load_state_dict(torch.load(res_path, map_location=device))
             # remove fully connected layer, avg pool, layer4 and layer5:
             self.resnet = nn.Sequential(*list(resnet.children())[:-4])
 
