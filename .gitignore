@@ -115,12 +115,10 @@ modules/deeplabv3/pretrained/
 modules/edge_connect/docker/
 modules/edge_connect/kronos-config.yml
 modules/olds.py
-data/exp/
-data/video/
+src/data/exp/
+src/data/video/
 *.png
 *.pth
 *.pkl
 *.avi
-exp/
 visualization.ipynb
-
