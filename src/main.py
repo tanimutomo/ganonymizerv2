@@ -136,6 +136,6 @@ if __name__ == '__main__':
     # mode should be choosen from ['img', 'dir', 'pmd', 'demo']
     mode = "video"
     data_root = os.path.join(os.getcwd(), "data/video")
-    filename = "noon_half_short.avi"
+    filename = "noon_half_vshort.avi"
     main(mode, data_root, filename)
 

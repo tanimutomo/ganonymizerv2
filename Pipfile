@@ -18,6 +18,7 @@ future = "*"
 matplotlib = "*"
 pyyaml = "*"
 flask = "*"
+jupyterlab = "*"
 
 [requires]
 python_version = "3.7"
