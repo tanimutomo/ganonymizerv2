@@ -1,7 +1,8 @@
 import cv2
-import numpy as np
+import torch
 
-from .utils import Debugger, labels, detect_object
+from .utils import Debugger, labels, detect_object, where
+
 
 class MaskCreater:
     def __init__(self, config):
@@ -18,12 +19,12 @@ class MaskCreater:
                 dynamic_object_ids.append(label.trainId)
 
         # create the mask image using only segmap
-        obj_mask = segmap.copy()
+        obj_mask = segmap.clone()
         for do_id in dynamic_object_ids:
-            obj_mask = np.where(obj_mask==do_id, 255, obj_mask).astype(np.uint8)
-        obj_mask = np.where(obj_mask==255, 255, 0)
+            obj_mask = where(obj_mask==do_id, 255, 0).to(torch.uint8)
+        obj_mask = where(obj_mask==255, 255, 0).to(torch.uint8)
 
-        return obj_mask.astype(np.uint8)
+        return obj_mask.to(torch.uint8)
 
     def separated_mask(self, img, segmap, crop_rate):
         mask, _ = self.mask(img, segmap, labels)
@@ -32,12 +33,12 @@ class MaskCreater:
         inputs = []
         
         for label, stat in zip(labels, stats):
-            box = np.array([0, 0, 0, 0])
-            obj = np.where(label_map==label, 255, 0).astype(np.uint8)
-            tl = np.array([stat[0], stat[1]])
+            box = torch.array([0, 0, 0, 0])
+            obj = where(label_map==label, 255, 0).to(torch.uint8)
+            tl = torch.array([stat[0], stat[1]])
             w, h = stat[2], stat[3]
-            br = np.array([stat[0] + w, stat[1] + h])
-            center = np.floor(((br + tl) / 2)).astype(np.int32)
+            br = torch.array([stat[0] + w, stat[1] + h])
+            center = torch.floor(((br + tl) / 2)).to(torch.int32)
             area = stat[4]
 
             if w*3 > 256:
@@ -86,14 +87,14 @@ class MaskCreater:
         return ntop, nbot
 
     def _adjust_imsize(self, img):
-        size = np.array([img.shape[0], img.shape[1]])
-        nsize = np.array([0, 0])
-        argmax = np.argmax(size)
+        size = torch.array([img.shape[0], img.shape[1]])
+        nsize = torch.array([0, 0])
+        argmax = torch.argmax(size)
         if size[argmax] > 300:
-            argmin = np.argmin(size)
+            argmin = torch.argmin(size)
             rate = 300 / size[argmax]
             nsize[argmax] = 300
-            nsize[argmin] = np.ceil(size[argmin] * rate).astype(np.int32)
+            nsize[argmin] = torch.ceil(size[argmin] * rate).to(torch.int32)
         else:
             nsize = size.copy()
 

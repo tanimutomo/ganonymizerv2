@@ -9,6 +9,12 @@ from collections import namedtuple
 from skimage.segmentation import mark_boundaries
 
 
+def where(cond, true_val, false_val):
+    true_tensor = torch.ones_like(cond).to(cond.device) * true_val
+    false_tensor = torch.ones_like(cond).to(cond.device) * true_val
+    return torch.where(cond, true_tensor, false_tensor)
+
+
 def load_img(img_path):
     # Loading input image
     print('===== Loading Image =====')

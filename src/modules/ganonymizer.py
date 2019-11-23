@@ -1,8 +1,12 @@
-import os
 import cv2
+import os
 import pickle
-import numpy as np
+import PIL
+import torch
+import torchvision
+
 from PIL import Image
+from torchvision import transforms
 
 from .semantic_segmenter import SemanticSegmenter
 from .mask_creater import MaskCreater
@@ -42,6 +46,8 @@ class GANonymizer:
     def predict(self, img):
         self.debugger.img(img, 'Input Image')
 
+        img = self._array_to_tensor(img)
+
         # semantic segmentation for detecting dynamic objects and creating mask
         segmap = self._semseg(img)
 
@@ -64,7 +70,7 @@ class GANonymizer:
         # resize inputs
         divimg = self._resize(divimg)
         divmask = self._resize(divmask)
-        divmask = np.where(divmask > 127, 255, 0).astype(np.uint8)
+        divmask = torch.where(divmask > 127, 255, 0).to(torch.uint8)
 
         # image and edge inpainting
         out = self._inpaint(divimg, divmask)
@@ -75,40 +81,51 @@ class GANonymizer:
         return out
 
 
+    def _array_to_tensor(self, array_img):
+        return torch.from_numpy(array_img).permute(2, 0, 1)
+
+
     def _resize(self, img):
         # resize inputs
         new_h = int(img.shape[0] / self.config.resize_factor)
         new_w = int(img.shape[1] / self.config.resize_factor)
-        out = cv2.resize(img, (new_w, new_h)).astype(np.uint8)
+        out = Image.fromarray(img).resize((new_h, new_w)).to(torch.uint8)
+        # out = cv2.resize(img, (new_w, new_h)).to(torch.uint8)
         return out
 
     def _combine_masks(self, img, omask, smask, labelmap):
         # check omask and smak shape
         assert omask.shape == smask.shape
 
+        img = self._array_to_tensor(img)
+        omask = self._array_to_tensor(omask)
+        smask = self._array_to_tensor(smask)
+        labelmap = self._array_to_tensor(labelmap)
+
         # combine the object mask and the shadow mask
-        mask = np.where(omask + smask > 0, 255, 0).astype(np.uint8)
+        # mask = np.where(omask + smask > 0, 255, 0).astype(np.uint8)
+        mask = torch.where(omask + smask > 0, 255, 0).to(torch.uint8)
         mask = expand_mask(mask, self.config.expand_width)
         self.debugger.img(mask, 'Mask (Object Mask + Shadow Mask)')
         self.debugger.imsave(mask, self.config.fname + '_mask.' + self.config.fext)
 
         # expand labelmap
-        for label in range(1, np.max(labelmap)+1):
-            objmap = np.where(labelmap == label, 1, 0)
+        for label in range(1, torch.max(labelmap)+1):
+            objmap = torch.where(labelmap == label, 1, 0)
             objmap = expand_mask(objmap, self.config.expand_width)
-            objmap = (objmap / 255 * label).astype(np.int32)
-            labelmap = np.where(labelmap == 0, objmap, labelmap)
+            objmap = (objmap / 255 * label).to(torch.int32)
+            labelmap = torch.where(labelmap == 0, objmap, labelmap)
         self.debugger.img(labelmap, 'Expanded LabelMap')
 
         # visualization the mask overlayed image
-        mask3c = np.stack([mask, np.zeros_like(mask), np.zeros_like(mask)], axis=-1)
-        overlay = (img * 0.7 + mask3c * 0.3).astype(np.uint8)
+        mask3c = torch.stack([mask, torch.zeros_like(mask), torch.zeros_like(mask)], dim=-1)
+        overlay = (img * 0.7 + mask3c * 0.3).to(torch.uint8)
         self.debugger.img(overlay, 'Mask Overlayed Image')
         self.debugger.imsave(overlay, self.config.fname + '_mask_overlayed.' + self.config.fext)
 
         # image with mask
-        mask3c = np.stack([mask for _ in range(3)], axis=-1)
-        img_with_mask = np.where(mask3c==255, mask3c, img).astype(np.uint8)
+        mask3c = torch.stack([mask for _ in range(3)], dim=-1)
+        img_with_mask = torch.where(mask3c==255, mask3c, img).to(torch.uint8)
         self.debugger.img(img_with_mask, 'Image with Mask')
         self.debugger.imsave(img_with_mask, self.config.fname + '_img_with_mask.' + self.config.fext)
 
@@ -141,11 +158,10 @@ class GANonymizer:
                     self.mc.entire_mask, img, semseg_map)
 
         # visualize the mask overlayed image
-        omask3c = np.stack([omask, np.zeros_like(omask), np.zeros_like(omask)], axis=-1)
-        overlay = (img * 0.7 + omask3c * 0.3).astype(np.uint8)
+        omask3c = torch.stack([omask, torch.zeros_like(omask), torch.zeros_like(omask)], dim=0)
+        overlay = (img * 0.7 + omask3c * 0.3).to(torch.uint8)
         self.debugger.img(overlay, 'Object Mask Overlayed Image')
         self.debugger.imsave(overlay, self.config.fname + '_omask_overlayed.' + self.config.fext)
-
         return omask
 
     def _split_object(self, omask):
@@ -164,15 +180,15 @@ class GANonymizer:
         # shadow detection
         print('===== Shadow Detection =====')
         if self.config.shadow_mode is 'none':
-            smask, labelmap = np.zeros_like(labelmap).astype(np.uint8), labelmap
+            smask, labelmap = torch.zeros_like(labelmap).to(torch.uint8), labelmap
         else:
             smask, labelmap = self._exec_module(self.config.shadow_mode,
                                                 ['smask', 'slabelmap'],
                                                 self.sd.detect,
                                                 img, labelmap)
         # visualize the mask overlayed image
-        smask3c = np.stack([smask, np.zeros_like(smask), np.zeros_like(smask)], axis=-1)
-        overlay = (img * 0.7 + smask3c * 0.3).astype(np.uint8)
+        smask3c = torch.stack([smask, torch.zeros_like(smask), torch.zeros_like(smask)], dim=-1)
+        overlay = (img * 0.7 + smask3c * 0.3).to(torch.uint8)
         self.debugger.img(overlay, 'Shadow Mask Overlayed Image')
         self.debugger.imsave(overlay, self.config.fname + '_smask_overlayed.' + self.config.fext)
 

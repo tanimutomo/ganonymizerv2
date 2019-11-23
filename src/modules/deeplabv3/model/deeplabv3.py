@@ -3,6 +3,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision
+from torchvision import transforms
 
 import os
 import numpy as np
@@ -65,32 +67,17 @@ class DeepLabV3(nn.Module):
 
         return output
 
-    
     def _preprocess(self, img):
         # normalize the img (with mean and std for the pretrained ResNet):
-        img = img / 255.0
-        img = img - np.array([0.485, 0.456, 0.406])
-        img = img / np.array([0.229, 0.224, 0.225]) # (shape: (512, 1024, 3))
-        img = np.transpose(img, (2, 0, 1)) # (shape: (3, 512, 1024))
-        img = img.astype(np.float32)
-
-        # convert numpy -> torch:
-        img = torch.from_numpy(img) # (shape: (3, 512, 1024))
-
-        img = torch.unsqueeze(img, 0) # (shape: (batch_size, 3, img_h, img_w))
-        img = img.to(self.device) # (shape: (batch_size, 3, img_h, img_w))
-
-        return img
-
+        img = img.to(torch.float32) / 255
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                         std=[0.229, 0.224, 0.225])
+        tensor = normalize(img)
+        return tensor.unsqueeze(0).to(self.device)
 
     def _postprocess(self, img):
         # (shape: (batch_size, num_classes, img_h, img_w))
-        img = torch.squeeze(img, 0) # (shape: (num_classes, img_h, img_w))
-        img = img.data.cpu().numpy() # (shape: (num_classes, img_h, img_w))
-        pred_labels = np.argmax(img, axis=0) # (shape: (img_h, img_w))
-        pred_labels = pred_labels.astype(np.uint8)
-
-        labels = np.reshape(pred_labels, -1)
-
+        img = img.squeeze(0).data.cpu() # (shape: (num_classes, img_h, img_w))
+        pred_labels = torch.argmax(img, dim=0) # (shape: (img_h, img_w))
+        pred_labels = pred_labels.to(torch.uint8)
         return pred_labels
-
