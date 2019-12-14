@@ -51,6 +51,8 @@ class GANonymizer:
         img = self.to_tensor(pil_img) # to torch.tensor in [0, 1]
         self.debugger.img(img, 'Input Image')
 
+        img = self._array_to_tensor(img)
+
         # semantic segmentation for detecting dynamic objects and creating mask
         label_map = self._semseg(img)
 

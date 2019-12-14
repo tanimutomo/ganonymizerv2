@@ -85,3 +85,4 @@ class DeepLabV3(nn.Module):
         label_map = torch.squeeze(label_map, 0) # (shape: (num_classes, img_h, img_w))
         label_map = label_map.data.cpu() # (shape: (num_classes, img_h, img_w))
         return torch.argmax(label_map, dim=0).to(torch.uint8) # (shape: (img_h, img_w))
+

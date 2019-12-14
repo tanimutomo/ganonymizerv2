@@ -3,6 +3,8 @@ import cv2
 import numpy as np
 import os
 import torch
+import warnings
+warnings.simplefilter('ignore')
 
 
 if os.path.basename(os.getcwd()) in ['src', 'app']:
