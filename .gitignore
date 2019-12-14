@@ -8,9 +8,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-build/
-develop-eggs/
-dist/
+build/ develop-eggs/ dist/
 downloads/ eggs/
 .eggs/
 lib/
@@ -111,12 +109,13 @@ dmypy.json
 
 .DS_Store
 # kronos-config.yml
-modules/deeplabv3/pretrained/
-modules/edge_connect/docker/
-modules/edge_connect/kronos-config.yml
-modules/olds.py
+src/modules/deeplabv3/pretrained/
+src/modules/edge_connect/docker/
+src/modules/edge_connect/kronos-config.yml
+src/modules/olds.py
 src/data/exp/
 src/data/video/
+src/log/
 *.png
 *.pth
 *.pkl
