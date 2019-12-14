@@ -55,7 +55,7 @@ class DeepLabV3(nn.Module):
 
         feature_map = self.resnet(x) # (shape: (batch_size, 512, h/16, w/16)) (assuming self.resnet is ResNet18_OS16 or ResNet34_OS16. If self.resnet is ResNet18_OS8 or ResNet34_OS8, it will be (batch_size, 512, h/8, w/8). If self.resnet is ResNet50-152, it will be (batch_size, 4*512, h/16, w/16))
         output = self.aspp(feature_map) # (shape: (batch_size, num_classes, h/16, w/16))
-        output = F.interpolate(output, size=(h, w), mode="bilinear") # (shape: (batch_size, num_classes, h, w))
+        output = F.interpolate(output, size=(h, w), mode="bilinear", align_corners=True) # (shape: (batch_size, num_classes, h, w))
 
         # image postprocess
         output = self._postprocess(output)
@@ -64,17 +64,6 @@ class DeepLabV3(nn.Module):
     
     def _preprocess(self, img):
         # "img" is torch.tensor in [0, 1]
-
-        # # normalize the img (with mean and std for the pretrained ResNet):
-        # img = img / 255.0
-        # img = img - np.array([0.485, 0.456, 0.406])
-        # img = img / np.array([0.229, 0.224, 0.225]) # (shape: (512, 1024, 3))
-        # img = np.transpose(img, (2, 0, 1)) # (shape: (3, 512, 1024))
-        # img = img.astype(np.float32)
-
-        # # convert numpy -> torch:
-        # img = torch.from_numpy(img) # (shape: (3, 512, 1024))
-
         img = self.normalize(img) 
         img = torch.unsqueeze(img, 0) # (shape: (batch_size, 3, img_h, img_w))
         img = img.to(self.device) # (shape: (batch_size, 3, img_h, img_w))

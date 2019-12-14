@@ -14,11 +14,10 @@ from .models import EdgeModel, InpaintingModel
 from .config import Config
 
 class SimpleEdgeConnect():
-    def __init__(self, checkpoints_path, sigma, device, debugger):
-        self.debugger = debugger
-        self.device = device
-        self.sigma = sigma
+    def __init__(self, checkpoints_path, sigma, device):
         self.checkpoints_path = checkpoints_path
+        self.sigma = sigma
+        self.device = device
 
         path = os.path.join(checkpoints_path, 'places2')
         config_path = os.path.join(path, 'config.yml')
@@ -50,8 +49,6 @@ class SimpleEdgeConnect():
         gray = self.to_tensor(self.to_pil(img).convert('L'))
         edge = self._get_edge(gray, mask)
         img, gray, mask, edge = self._preprocess(img, gray, mask, edge)
-        for item, name in [(img, 'img'), (mask, 'mask'), (gray, 'gray'), (edge, 'edge')]:
-            self.debugger.matrix(item, name)
 
         # inpaint with edge model / joint model
         out_edge = self.edge_model(gray, edge, mask).detach()
