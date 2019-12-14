@@ -1,13 +1,11 @@
-# camera-ready
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torchvision
-from torchvision import transforms
-
 import os
 import numpy as np
+import torch
+import torchvision
+
+import torch.nn as nn
+import torch.nn.functional as F
+from torchvision import transforms
 
 from .resnet import ResNet18_OS16, ResNet34_OS16, ResNet50_OS16, ResNet101_OS16, ResNet152_OS16, ResNet18_OS8, ResNet34_OS8
 from .aspp import ASPP, ASPP_Bottleneck
@@ -20,9 +18,9 @@ class DeepLabV3(nn.Module):
         self.num_classes = 20
         self.device = device
 
-        # self.model_id = model_id
-        # self.project_dir = project_dir
-        # self.create_model_dirs()
+        self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                              std=[0.229, 0.224, 0.225])
+
         if res_type == 18:
             weight_name = "resnet18-5c106cde.pth"
             self.resnet = ResNet18_OS8(os.path.join(res_path, weight_name), self.device) # NOTE! specify the type of ResNet here
@@ -47,7 +45,6 @@ class DeepLabV3(nn.Module):
         self.resnet.to(self.device)
         self.aspp.to(self.device)
 
-
     def forward(self, x):
         # image preprocessing
         x = self._preprocess(x)
@@ -57,27 +54,35 @@ class DeepLabV3(nn.Module):
         w = x.size()[3]
 
         feature_map = self.resnet(x) # (shape: (batch_size, 512, h/16, w/16)) (assuming self.resnet is ResNet18_OS16 or ResNet34_OS16. If self.resnet is ResNet18_OS8 or ResNet34_OS8, it will be (batch_size, 512, h/8, w/8). If self.resnet is ResNet50-152, it will be (batch_size, 4*512, h/16, w/16))
-
         output = self.aspp(feature_map) # (shape: (batch_size, num_classes, h/16, w/16))
-
-        output = F.upsample(output, size=(h, w), mode="bilinear") # (shape: (batch_size, num_classes, h, w))
+        output = F.interpolate(output, size=(h, w), mode="bilinear") # (shape: (batch_size, num_classes, h, w))
 
         # image postprocess
         output = self._postprocess(output)
 
         return output
-
+    
     def _preprocess(self, img):
-        # normalize the img (with mean and std for the pretrained ResNet):
-        img = img.to(torch.float32) / 255
-        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                         std=[0.229, 0.224, 0.225])
-        tensor = normalize(img)
-        return tensor.unsqueeze(0).to(self.device)
+        # "img" is torch.tensor in [0, 1]
 
-    def _postprocess(self, img):
+        # # normalize the img (with mean and std for the pretrained ResNet):
+        # img = img / 255.0
+        # img = img - np.array([0.485, 0.456, 0.406])
+        # img = img / np.array([0.229, 0.224, 0.225]) # (shape: (512, 1024, 3))
+        # img = np.transpose(img, (2, 0, 1)) # (shape: (3, 512, 1024))
+        # img = img.astype(np.float32)
+
+        # # convert numpy -> torch:
+        # img = torch.from_numpy(img) # (shape: (3, 512, 1024))
+
+        img = self.normalize(img) 
+        img = torch.unsqueeze(img, 0) # (shape: (batch_size, 3, img_h, img_w))
+        img = img.to(self.device) # (shape: (batch_size, 3, img_h, img_w))
+        return img
+
+    def _postprocess(self, label_map):
         # (shape: (batch_size, num_classes, img_h, img_w))
-        img = img.squeeze(0).data.cpu() # (shape: (num_classes, img_h, img_w))
-        pred_labels = torch.argmax(img, dim=0) # (shape: (img_h, img_w))
-        pred_labels = pred_labels.to(torch.uint8)
-        return pred_labels
+        label_map = torch.squeeze(label_map, 0) # (shape: (num_classes, img_h, img_w))
+        label_map = label_map.data.cpu() # (shape: (num_classes, img_h, img_w))
+        return torch.argmax(label_map, dim=0).to(torch.uint8) # (shape: (img_h, img_w))
+

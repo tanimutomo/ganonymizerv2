@@ -58,7 +58,7 @@ def main(mode, data_root, filename=None):
         print('Loading "{}"'.format(filepath)) 
         img, fname, fext = load_img(filepath)
         if config.mode == 'demo':
-            img = demo_resize(img)
+            img = demo_resize(np.array(img))
         config.fname = fname
         config.fext = fext
         # model prediction

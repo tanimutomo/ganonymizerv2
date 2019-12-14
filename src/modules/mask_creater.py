@@ -1,8 +1,6 @@
 import cv2
+import numpy as np
 import torch
-
-from .utils import Debugger, labels, detect_object, where
-
 
 class MaskCreater:
     def __init__(self, config):
@@ -10,21 +8,24 @@ class MaskCreater:
         self.thresh = 3
         self.debugger = Debugger(config.mask_mode, save_dir=config.checkpoint)
 
-    def entire_mask(self, img, segmap):
-        # collect dynamic object's id
-        dynamic_object_ids = []
+        self.target_ids = list()
         for label in labels:
             if ((label.category is 'vehicle' or label.category is 'human')
                     and label.trainId is not 19):
-                dynamic_object_ids.append(label.trainId)
 
-        # create the mask image using only segmap
+                self.target_ids.append(label.trainId)
+
+    def entire_mask(self, segmap):
         obj_mask = segmap.clone()
-        for do_id in dynamic_object_ids:
-            obj_mask = where(obj_mask==do_id, 255, 0).to(torch.uint8)
-        obj_mask = where(obj_mask==255, 255, 0).to(torch.uint8)
-
-        return obj_mask.to(torch.uint8)
+        for id_ in self.target_ids:
+            obj_mask = torch.where(obj_mask==id_
+                                   torch.full_like(segmap, 255),
+                                   obj_mask,
+                                   dtype=torch.uint8)
+        return  torch.where(obj_mask==255,
+                            torch.full_like(segmap, 255),
+                            torch.full_like(segmap, 0)
+                            dtype=torch.uint8)
 
     def separated_mask(self, img, segmap, crop_rate):
         mask, _ = self.mask(img, segmap, labels)
@@ -103,4 +104,3 @@ class MaskCreater:
         out = cv2.resize(img, (nsize[1], nsize[0]))
 
         return out
-
