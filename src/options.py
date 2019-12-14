@@ -12,14 +12,11 @@ def get_options(args=None):
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
 
+    # main
     parser.add_argument('--input', type=str, required=True)
+    parser.add_argument('--mode', type=str, default='exec', choices=['exec', 'debug', 'save'])
     parser.add_argument('--log_root', type=str, default='log')
     parser.add_argument('--gpu_id', type=int, default=0)
-
-    # *_mode (choose in ['pass', 'save', 'exec', 'debug', 'none'])
-    parser.add_argument('--main_mode', type=str, default='exec')
-    parser.add_argument('--semseg_mode', type=str, default='exec')
-    parser.add_argument('--inpaint_mode', type=str, default='exec')
 
     # resize
     parser.add_argument('--resize_factor', type=float, default=None)
@@ -44,7 +41,12 @@ def get_options(args=None):
         opt.log_root,
         datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
     )
-    _check_dir(opt.log)
+    os.makedirs(opt.log)
+    if opt.mode is not 'exec':
+        opt.inter_log = os.path.join(opt.log, 'intermediates')
+        os.mkdir(opt.inter_log)
+    else:
+        opt.inter_log = None
 
     _print_options(parser, opt)
     return opt
@@ -62,8 +64,3 @@ def _print_options(parser, opt):
     message += '---------------------------- End ------------------------------'
     print(message)
 
-
-def _check_dir(path):
-    os.makedirs(path)
-    os.makedirs(os.path.join(path, 'ckpt'))
-    os.makedirs(os.path.join(path, 'intermidiates'))

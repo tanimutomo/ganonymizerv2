@@ -1,53 +1,14 @@
-import os
+import collections
 import cv2
-import torch
-import shutil
 import numpy as np
+import os
+import PIL
+import torch
+import torchvision
+
 from PIL import Image
-import matplotlib.pyplot as plt
 from collections import namedtuple
-from skimage.segmentation import mark_boundaries
-
-
-def where(cond, true_val, false_val):
-    true_tensor = torch.ones_like(cond).to(cond.device) * true_val
-    false_tensor = torch.ones_like(cond).to(cond.device) * true_val
-    return torch.where(cond, true_tensor, false_tensor)
-
-
-def load_img(img_path):
-    # Loading input image
-    print('===== Loading Image =====')
-    fname, fext = img_path.split('/')[-1].split('.')
-    img = Image.open(img_path)
-    return img, fname, fext
-
-
-def load_video(path):
-    """
-    Load the input video data
-    """
-    print('===== Loading Image =====')
-    fname, fext = path.split('/')[-1].split('.')
-    cap = cv2.VideoCapture(path)
-    W = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    H = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    print('[INFO] total frame: {}, fps: {}, width: {}, height: {}'.format(frames, fps, W, H))
-
-    return fname, cap, fps, frames, W, H
-    
-
-def video_writer(in_path, fps, width, height):
-    fname, fext = in_path.split('/')[-1].split('.')
-    out_path = os.path.join('/'.join(in_path.split('/')[:-2]),
-                            "output", "out_" + fname + '.' + fext)
-    print("Saved Video Path:", out_path)
-    # video writer
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    writer = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
-    return writer
+from torchvision import transforms
 
 
 def demo_resize(img):
@@ -76,228 +37,52 @@ def demo_resize(img):
     return np.array(out).astype(np.uint8)
 
 
-def tensor_img_to_numpy(tensor):
-    array = tensor.numpy()
-    array = np.transpose(array, (1, 2, 0))
-    return array
-
-
-def detect_object(img, debugger):
-    num, labelmap, stats, _ = cv2.connectedComponentsWithStats(img)
-    debugger.img(labelmap, 'labelmap')
-    # stat is [tl_x, tl_y, w, h, area]
-    label_list = [i+1 for i in range(num - 1)]
-    return labelmap, stats[1:], label_list
-
-
-def expand_mask(mask, width):
-    if width == 0: return mask
-    mask = mask.astype(np.uint8)
-    contours, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-    mask = cv2.drawContours(mask, contours, -1, 255, width) 
-    return mask.astype(np.uint8)
-
-
-def write_labels(img, segmap, size):
-    out = mark_boundaries(img, segmap)
-    labels = np.unique(segmap)
-    for label in labels:
-        ys, xs = np.where(segmap==label)
-        my, mx = np.median(ys).astype(np.int32), np.median(xs).astype(np.int32)
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        out = cv2.putText(out, str(label), (mx - 10, my), font, size, (0, 255, 255), 1, cv2.LINE_AA)
-    return out
-
-
-def bar_plot(gray, label, comment, cluster=None):
-    print('-'*10, comment, '-'*10)
-    plt.figure(figsize=(10, 10), dpi=200)
-    if cluster is None:
-        plt.bar(np.arange(gray.shape[0]), gray,
-                tick_label=label, align='center')
-    else:
-        color = flatten([['r', 'g', 'b', 'c', 'm', 'y'] for _ in range(100)])
-        bar_color = [color[c] for c in cluster]
-        plt.bar(np.arange(gray.shape[0]), gray,
-                color=bar_color, tick_label=label, align='center')
-    plt.show()
-    print('-' * (len(comment) + 22))
-
-
-def flatten(nested_list):
-    """2重のリストをフラットにする関数"""
-    return [e for inner_list in nested_list for e in inner_list]
-
-
-def pmd_mode_change(config, pmd):
-    if pmd == 'on':
-        config.main_mode = 'exec'
-        config.semseg_mode = 'save'
-        config.mask_mode = 'save'
-        config.split_mode = 'save'
-        config.shadow_mode = 'save'
-        config.random_mode = 'save'
-        config.divide_mode = 'exec'
-        config.inpaint_mode = 'exec'
-    elif pmd == 'off':
-        config.main_mode = 'exec'
-        config.semseg_mode = 'pass'
-        config.mask_mode = 'pass'
-        config.split_mode = 'pass'
-        config.shadow_mode = 'pass'
-        config.random_mode = 'pass'
-        config.divide_mode = 'none'
-        config.inpaint_mode = 'exec'
-    return config
-
-
-def demo_config(config):
-    config.main_mode = 'exec'
-    config.semseg_mode = 'exec'
-    config.mask_mode = 'exec'
-    config.split_mode = 'exec'
-    config.shadow_mode = 'exec'
-    config.divide_mode = 'exec'
-    config.inpaint_mode = 'exec'
-
-    config.random_mode = 'none'
-
-    return config
-
-
-def create_dir(path):
-    if os.path.exists(path):
-        if os.path.isfile(path):
-            dirpath = os.path.dirname(path)
-            rootpath = os.path.dirname(dirpath)
-            if os.path.basename(dirpath) == 'input':
-                _create_det_dir(rootpath)
-                return path
-            else:
-                os.mkdir(os.path.join(dirpath, 'input'))
-                files = os.listdir(dirpath)
-                files = [os.path.join(dirpath, f) for f in files 
-                        if os.path.isfile(os.path.join(dirpath, f)) and f[0] != '.']
-                for f in files:
-                    shutil.move(f, os.path.join(dirpath, 'input'))
-                _create_det_dir(dirpath)
-                return os.path.join(dirpath, 'input', os.path.basename(path))
-
-        elif os.path.isdir(path):
-            if os.path.basename(path) == 'input':
-                raise RuntimeError('path should be dataset root '\
-                                   'directory path os an image path')
-            else:
-                if not os.path.exists(os.path.join(path, 'input')):
-                    os.mkdir(os.path.join(path, 'input'))
-                files = os.listdir(path)
-                files = [os.path.join(path, f) for f in files 
-                        if os.path.isfile(os.path.join(path, f)) and f[0] != '.']
-                for f in files:
-                    shutil.move(f, os.path.join(path, 'input'))
-                _create_det_dir(path)
-                return path
-    else:
-        raise RuntimeError('input argument path is not existed')
-
-
-def _create_det_dir(rootpath):
-    for name in ['ckpt', 'output', 'pmd']:
-        if not os.path.exists(os.path.join(rootpath, name)):
-            os.mkdir(os.path.join(rootpath, name))
-
-
-class Config(dict):
-    def __init__(self, config):
-        self._conf = config
- 
-    def __getattr__(self, name):
-        if self._conf.get(name) is not None:
-            return self._conf[name]
-
-        return None
-
-
 class Debugger:
-    def __init__(self, mode, save_dir=None):
+    def __init__(self, mode, save_dir):
         self.mode = mode
         self.save_dir = save_dir
+        self.to_pil = transforms.ToPILImage()
 
-    def img(self, img, comment):
-        if self.mode is 'debug':
-            print('-'*10, comment, '-'*10)
-            self.matrix(img, comment)
-            if type(img) is torch.Tensor and len(list(img.shape)) == 3:
-                img = tensor_img_to_numpy(img)
-                
-            plt.figure(figsize=(10, 10), dpi=200)
-            plt.imshow(img)
-            if img.ndim == 2 and np.unique(img).size == 2:
-                plt.gray()
-            plt.show()
-            print('-' * (len(comment) + 22))
-
-
-    def param(self, param, comment):
-        if self.mode is 'debug':
+    def value(self, value, comment):
+        if self.mode == 'debug':
             print('-----', comment, '-----')
-            print(param)
+            print(value)
             print('-' * (len(comment) + 12))
 
-
-    def imsave(self, img, filename):
-        if self.mode in ['debug', 'save']:
-            path = os.path.join(self.save_dir, filename)
-            if type(img) is torch.Tensor:
-                img = img.cpu().numpy().astype(np.uint8)
-                img = Image.fromarray(img)
-                img.save(path)
-            elif type(img) is np.ndarray:
-                img = Image.fromarray(img)
-                img.save(path)
-            else:
-                raise RuntimeError('The type of input image must be numpy.ndarray or torch.Tensor.')
-
-
     def matrix(self, mat, comment):
-        if self.mode is 'debug':
+        if self.mode == 'debug':
             print('-----', comment, '-----')
             if type(mat) is torch.Tensor:
                 if 'float' in str(mat.dtype):
-                    print('shape: {}   dtype: {}   min: {}   mean: {}   max: {}   device: {}'.format(
-                        mat.shape, mat.dtype, mat.min(), mat.mean(), mat.max(), mat.device))
+                    print('shape: {}   dtype: {}   min: {}   mean: {}   median: {}   max: {}   device: {}'.format(
+                        mat.shape, mat.dtype, mat.min(), mat.mean(), mat.median(), mat.max(), mat.device))
                 else:
-                    print('shape: {}   dtype: {}   min: {}   mean: {}   max: {}   device: {}'.format(
-                        mat.shape, mat.dtype, mat.min(), mat.to(torch.float32).mean(), mat.max(), mat.device))
+                    print('shape: {}   dtype: {}   min: {}   mean: {}   median: {}   max: {}   device: {}'.format(
+                        mat.shape, mat.dtype, mat.min(), mat.to(torch.float32).mean(), mat.median(), mat.max(), mat.device))
 
             elif type(mat) is np.ndarray:
-                if mat.shape[0] == 0:
+                if mat.ndim == 1:
                     print(mat)
                 else:
-                    print('shape: {}   dtype: {}   min: {}   mean: {}   max: {}'.format(
-                        mat.shape, mat.dtype, mat.min(), mat.mean(), mat.max()))
+                    print('shape: {}   dtype: {}   min: {}   mean: {}   median: {}   max: {}'.format(
+                        mat.shape, mat.dtype, mat.min(), mat.mean(), mat.median(), mat.max()))
             else:
                 print('[Warning] Input type is {}, not matrix(numpy.ndarray or torch.tensor)!'.format(
                     type(mat)))
                 print(mat)
             print('-' * (len(comment) + 12))
 
-
-class AverageMeter:
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
-
-    def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
+    def imsave(self, img, filename):
+        if self.mode == 'save':
+            path = os.path.join(self.save_dir, filename)
+            if type(img) is torch.Tensor:
+                img = self.to_pil(img)
+                img.save(path)
+            elif type(img) is np.ndarray:
+                img = Image.fromarray(img)
+                img.save(path)
+            else:
+                raise RuntimeError('The type of input image must be numpy.ndarray or torch.Tensor.')
 
 
 # function for colorizing a label image:
