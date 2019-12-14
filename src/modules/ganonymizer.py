@@ -52,7 +52,7 @@ class GANonymizer:
     def _preprocess(self, img):
         img = self.to_tensor(img)
         if self.resize_factor is None:
-            return 
+            return img
         new_h = int(img.shape[1] / self.resize_factor)
         new_w = int(img.shape[2] / self.resize_factor)
         new_h -= new_h % 4
