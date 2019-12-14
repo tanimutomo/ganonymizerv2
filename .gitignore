@@ -116,6 +116,7 @@ src/modules/olds.py
 src/data/exp/
 src/data/video/
 src/log/
+src/notebook/
 *.png
 *.pth
 *.pkl
