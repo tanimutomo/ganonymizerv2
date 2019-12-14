@@ -14,13 +14,11 @@ class SemanticSegmenter():
         else:
             raise RuntimeError('Please prepare {} model in modules/ .'.format(self.config.semseg))
 
-
     def predict(self, img):
         # semantic segmentation
         semseg_map = self.model(img)
 
         return semseg_map
-
 
     def _set_deeplabv3(self):
         weights = os.path.join(self.config.mod_root,

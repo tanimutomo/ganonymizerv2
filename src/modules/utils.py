@@ -14,8 +14,6 @@ def load_img(img_path):
     print('===== Loading Image =====')
     fname, fext = img_path.split('/')[-1].split('.')
     img = Image.open(img_path)
-    img = np.array(img)
-    # visualization
     return img, fname, fext
 
 

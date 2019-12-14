@@ -41,5 +41,3 @@ if __name__ == '__main__':
     img = os.path.join(config['checkpoints_path'], 'exp/inputs/places2_01.png')
     inpainter = Inpainter(config, device, debugger)
     inpainter.inpaint(img)
-
-
