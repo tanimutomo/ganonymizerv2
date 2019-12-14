@@ -43,13 +43,13 @@ class SimpleEdgeConnect():
         random.seed(config.SEED)
 
         # transforms
-        self.to_pil = ToPILImage()
-        self.to_tensor = ToTensor()
+        self.to_pil = transforms.ToPILImage()
+        self.to_tensor = transforms.ToTensor()
 
     def inpaint(self, img, mask):
-        gray = self.to_tensor(self.to_pil(gray).convert('L'))
+        gray = self.to_tensor(self.to_pil(img).convert('L'))
         edge = self._get_edge(gray, mask)
-        img, gray, mask, edge = self._cuda_tensor(img, gray, mask, edge)
+        img, gray, mask, edge = self._preprocess(img, gray, mask, edge)
         for item, name in [(img, 'img'), (mask, 'mask'), (gray, 'gray'), (edge, 'edge')]:
             self.debugger.matrix(item, name)
 
@@ -57,7 +57,7 @@ class SimpleEdgeConnect():
         out_edge = self.edge_model(gray, edge, mask).detach()
         out = self.inpaint_model(img, edge, mask)
         out_merged = (out * mask) + (img * (1 - mask))
-        return out_merged, out_edge, edge
+        return self._postprocess(out_merged, out_edge, edge)
 
     def _get_edge(self, gray, mask):
         gray = np.array(self.to_pil(gray)).astype(np.uint8)
@@ -66,10 +66,19 @@ class SimpleEdgeConnect():
         edge = canny(gray, sigma=self.sigma, mask=mask)
         return torch.from_numpy(edge).to(torch.float32)
 
-    def _cuda_tensor(self, *args):
+    def _preprocess(self, *args):
         items = list()
         for item in args:
             if item.ndim == 2:
                 item = torch.unsqueeze(item, 0)
             items.append(item.unsqueeze(0).to(self.device))
+        return items
+
+    def _postprocess(self, *args):
+        items = list()
+        for item in args:
+            item = torch.squeeze(item, 0)
+            if item.shape[0] == 1:
+                item = torch.squeeze(item, 0)
+            items.append(item.detach().cpu())
         return items

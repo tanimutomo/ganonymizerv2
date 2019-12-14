@@ -25,7 +25,7 @@ def main(mode, data_root, filename=None):
         assert mode == 'img' or mode == 'demo' or mode == "video"
         filepath = os.path.join(data_root, 'input', filename)
     else:
-        assert mode == 'pmd' or mode == 'dir'
+        assert mode == 'dir'
 
     # set configs
     config = Config(get_config(data_root))
@@ -77,32 +77,6 @@ def main(mode, data_root, filename=None):
             # model prediction
             model.predict(img)
 
-    elif config.mode == 'pmd':
-        inpath = os.path.join(dirpath, 'input')
-        files = os.listdir(inpath)
-        files = [os.path.join(inpath, f) for f in files 
-                if os.path.isfile(os.path.join(inpath, f)) and f[0] != '.']
-        for f in files:
-            print('Loading "{}"'.format(f)) 
-
-            # with pmd
-            config = pmd_mode_change(config, 'on')
-            model.reload_config(config)
-            img, fname, fext = load_img(f)
-            config.fname = fname
-            config.fext = fext
-            # model prediction
-            out_on = model.predict(img)
-            
-            # without pmd
-            config = pmd_mode_change(config, 'off')
-            model.reload_config(config)
-            img, fname, fext = load_img(f)
-            config.fname = fname
-            config.fext = fext
-            # model prediction
-            out_on = model.predict(img)
-
     elif config.mode == "video":
         print("Loading '{}'".format(filepath))
         count = 1
@@ -136,8 +110,7 @@ def main(mode, data_root, filename=None):
 
 if __name__ == '__main__':
     # mode should be choosen from ['img', 'dir', 'pmd', 'demo']
-    mode = "video"
-    data_root = os.path.join(os.getcwd(), "data/video")
-    filename = "noon_half_vshort.avi"
+    mode = "img"
+    data_root = os.path.join(os.getcwd(), "data/tmp")
+    filename = "example_01.jpg"
     main(mode, data_root, filename)
-

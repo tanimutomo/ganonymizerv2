@@ -51,8 +51,6 @@ class GANonymizer:
         img = self.to_tensor(pil_img) # to torch.tensor in [0, 1]
         self.debugger.img(img, 'Input Image')
 
-        img = self._array_to_tensor(img)
-
         # semantic segmentation for detecting dynamic objects and creating mask
         label_map = self._semseg(img)
 
@@ -109,7 +107,7 @@ class GANonymizer:
             raise RuntimeError('mask_mode should not be "none", if you want to execute entire GANonymizerV2')
         else:
             omask = self._exec_module(self.config.mask_mode, 'omask',
-                                      self.mc.entire_mask, img, label_map) # shape=(h, w) # dtype=torch.uint8
+                                      self.mc.create_mask, label_map) # shape=(h, w) # dtype=torch.uint8
 
         # visualize the mask overlayed image
         omask3c = torch.stack([omask, torch.zeros_like(omask), torch.zeros_like(omask)], dim=0)
@@ -121,11 +119,11 @@ class GANonymizer:
 
     def _resize(self, img, mask):
         # resize inputs
-        new_h = img.shape[0] // self.config.resize_factor)
-        new_w = img.shape[1] // self.config.resize_factor)
+        new_h = img.shape[1] // self.config.resize_factor
+        new_w = img.shape[2] // self.config.resize_factor
         img = self.to_pil(img).resize((new_w, new_h))
         mask = self.to_pil(mask).resize((new_w, new_h))
-        return self.to_tensor(out), self.to_tensor(mask)
+        return self.to_tensor(img), self.to_tensor(mask)
 
     def _inpaint(self, img, mask):
         # inpainter
@@ -275,6 +273,7 @@ class GANonymizer:
             return results
 
     def _save_output(self, out):
+        print(out.shape)
         outimg = self.to_pil(out)
         shadow = 'off' if self.config.shadow_mode is 'none' else 'on'
         pmd = 'off' if self.config.divide_mode is 'none' else 'on'

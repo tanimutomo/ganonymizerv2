@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 import torch
 
+from .utils import Debugger, labels
+
 class MaskCreater:
     def __init__(self, config):
         self.config = config
@@ -15,17 +17,15 @@ class MaskCreater:
 
                 self.target_ids.append(label.trainId)
 
-    def entire_mask(self, segmap):
+    def create_mask(self, segmap):
         obj_mask = segmap.clone()
         for id_ in self.target_ids:
-            obj_mask = torch.where(obj_mask==id_
-                                   torch.full_like(segmap, 255),
-                                   obj_mask,
-                                   dtype=torch.uint8)
+            obj_mask = torch.where(obj_mask==id_,
+                                   torch.full_like(obj_mask, 255),
+                                   obj_mask)
         return  torch.where(obj_mask==255,
                             torch.full_like(segmap, 255),
-                            torch.full_like(segmap, 0)
-                            dtype=torch.uint8)
+                            torch.full_like(segmap, 0))
 
     def separated_mask(self, img, segmap, crop_rate):
         mask, _ = self.mask(img, segmap, labels)
