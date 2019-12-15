@@ -53,8 +53,8 @@ class GANonymizer:
         img = self.to_tensor(img)
         if self.resize_factor is None:
             return img
-        new_h = int(img.shape[1] / self.resize_factor)
-        new_w = int(img.shape[2] / self.resize_factor)
+        new_h = int(img.shape[1] * self.resize_factor)
+        new_w = int(img.shape[2] * self.resize_factor)
         new_h -= new_h % 4
         new_w -= new_w % 4
         img = self.to_pil(img).resize((new_w, new_h))
