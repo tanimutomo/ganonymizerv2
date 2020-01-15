@@ -3,6 +3,7 @@ import cv2
 import pickle
 import numpy as np
 from PIL import Image
+import time
 
 from .semantic_segmenter import SemanticSegmenter
 from .mask_creater import MaskCreater
@@ -41,6 +42,7 @@ class GANonymizer:
     
     def predict(self, img):
         self.debugger.img(img, 'Input Image')
+        begin = time.time()
 
         # semantic segmentation for detecting dynamic objects and creating mask
         segmap = self._semseg(img)
@@ -68,6 +70,9 @@ class GANonymizer:
 
         # image and edge inpainting
         out = self._inpaint(divimg, divmask)
+
+        # processing time report
+        print('[INFO] elapsed time:', time.time() - begin)
 
         # save output image
         self._save_output(out)
