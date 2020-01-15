@@ -18,28 +18,25 @@ class DeepLabV3(nn.Module):
         self.num_classes = 20
         self.device = device
 
-        # self.model_id = model_id
-        # self.project_dir = project_dir
-        # self.create_model_dirs()
         if res_type == 18:
             weight_name = "resnet18-5c106cde.pth"
-            self.resnet = ResNet18_OS8(os.path.join(res_path, weight_name), self.device) # NOTE! specify the type of ResNet here
+            self.resnet = ResNet18_OS8(os.path.join(res_path, weight_name), torch.device('cpu')) # NOTE! specify the type of ResNet here
             self.aspp = ASPP(num_classes=self.num_classes) # NOTE! if you use ResNet50-152, set self.aspp = ASPP_Bottleneck(num_classes=self.num_classes) instead
         elif res_type == 34:
             weight_name = "resnet34-333f7ec4.pth"
-            self.resnet = ResNet18_OS8(os.path.join(res_path, weight_name), self.device)
+            self.resnet = ResNet18_OS8(os.path.join(res_path, weight_name), torch.device('cpu'))
             self.aspp = ASPP(num_classes=self.num_classes)
         elif res_type == 50:
             weight_name = "resnet50-19c8e357.pth"
-            self.resnet = ResNet18_OS50(os.path.join(res_path, weight_name), self.device)
+            self.resnet = ResNet18_OS50(os.path.join(res_path, weight_name), torch.device('cpu'))
             self.aspp = ASPP_Bottleneck(num_classes=self.num_classes)
         elif res_type == 101:
             weight_name = "resnet101-5d3b4d8f.pth"
-            self.resnet = ResNet18_OS101(os.path.join(res_path, weight_name), self.device)
+            self.resnet = ResNet18_OS101(os.path.join(res_path, weight_name), torch.device('cpu'))
             self.aspp = ASPP_Bottleneck(num_classes=self.num_classes)
         elif res_type == 152:
             weight_name = "resnet152-b121ed2d.pth"
-            self.resnet = ResNet18_OS152(os.path.join(res_path, weight_name), self.device)
+            self.resnet = ResNet18_OS152(os.path.join(res_path, weight_name), torch.device('cpu'))
             self.aspp = ASPP_Bottleneck(num_classes=self.num_classes)
 
         self.resnet.to(self.device)

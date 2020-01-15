@@ -23,10 +23,12 @@ class SimpleEdgeConnect():
 
         # Model setting and forward
         # build the model and initialize
-        self.edge_model = EdgeModel(config).to(device)
-        self.inpaint_model = InpaintingModel(config).to(device)
+        self.edge_model = EdgeModel(config)
+        self.inpaint_model = InpaintingModel(config)
         self.edge_model.load()
         self.inpaint_model.load()
+        self.edge_model.to(device)
+        self.inpaint_model.to(device)
         self.edge_model.eval()
         self.inpaint_model.eval()
 

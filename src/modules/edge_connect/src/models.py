@@ -22,11 +22,7 @@ class BaseModel(nn.Module):
         if os.path.exists(self.gen_weights_path):
             print('Loading %s generator...' % self.name)
             
-            if torch.cuda.is_available():
-                data = torch.load(self.gen_weights_path)
-            else: 
-                data = torch.load(self.gen_weights_path, map_location=lambda storage, loc: storage)
-
+            data = torch.load(self.gen_weights_path, map_location=torch.device('cpu'))
             self.generator.load_state_dict(data['generator'])
             self.iteration = data['iteration']
 
